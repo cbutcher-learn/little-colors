@@ -111,18 +111,18 @@
   .side-dock.left{ visibility:hidden; }
   .side-dock.left.show{ visibility:visible; }
 
-  .canvas-wrap{ flex:1; min-width:0; display:flex; align-items:center; justify-content:center; padding:4px 2px; min-height:0; }
+  .canvas-wrap{ flex:1; min-width:0; display:flex; align-items:center; justify-content:center; padding:0; min-height:0; }
   #canvasFrame{
     position:relative; background:var(--paper);
     border-radius:20px; box-shadow:0 8px 0 rgba(0,0,0,0.12);
     touch-action:none; overflow:hidden;
   }
-  #canvasFrame canvas, #canvasFrame img{ position:absolute; inset:0; width:100%; height:100%; }
+  #canvasFrame canvas, #canvasFrame img{ position:absolute; inset:0; width:100%; height:100%; object-fit:contain; }
   #outlineImg{ pointer-events:none; mix-blend-mode:multiply; }
 
   .color-row{
     flex:0 0 auto; display:flex; gap:10px; align-items:center; justify-content:center; flex-wrap:wrap;
-    padding: 10px 14px max(10px, env(safe-area-inset-bottom)) 14px;
+    padding: 8px 10px max(8px, env(safe-area-inset-bottom)) 10px;
     background:var(--paper); border-top-left-radius:24px; border-top-right-radius:24px;
   }
 
@@ -596,8 +596,8 @@ document.querySelectorAll(".shape-btn").forEach(b=>{
 /* ---------- Canvas sizing ---------- */
 function sizeCanvasFrame(){
   const wrap = document.querySelector(".canvas-wrap");
-  const wW = wrap.clientWidth - 20;
-  const wH = wrap.clientHeight - 12;
+  const wW = wrap.clientWidth;
+  const wH = wrap.clientHeight;
   const targetRatio = 4/3;
   let w = wW, h = w/targetRatio;
   if (h > wH){ h = wH; w = h*targetRatio; }
