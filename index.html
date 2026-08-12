@@ -914,11 +914,12 @@ document.getElementById("pdfInput").addEventListener("change", async (e)=>{
 renderColors();
 renderHome();
 
-if ("serviceWorker" in navigator){
-  window.addEventListener("load", ()=>{
-    navigator.serviceWorker.register("service-worker.js").catch(()=>{});
-  });
-}
+// Comment these out while active testing:
+//if ("serviceWorker" in navigator){
+  //window.addEventListener("load", ()=>{
+    //navigator.serviceWorker.register("service-worker.js").catch(()=>{});
+  //});
+//}
 </script>
 </body>
 </html>
