@@ -96,22 +96,23 @@
 
   .topbar{
     display:flex; align-items:center; justify-content:space-between;
-    padding: max(12px, env(safe-area-inset-top)) 16px 8px 16px; gap:10px; flex:0 0 auto;
+    padding: max(8px, env(safe-area-inset-top)) 12px 6px 12px; gap:10px; flex:0 0 auto;
   }
   .exit-btn{ background:var(--coral); font-size:16px; padding:12px 20px; height:52px; }
-  .page-name{ font-size:19px; font-weight:900; }
+  .zoom-controls{ display:flex; gap:10px; align-items:center; }
+  .zoom-btn{ background:var(--sky-deep); font-size:24px; width:52px; height:52px; }
   .clear-btn{ background:#6C757D; font-size:14px; padding:12px 18px; height:52px; }
 
-  .main-row{ flex:1; display:flex; flex-direction:row; min-height:0; gap:6px; padding:0 8px; }
+  .main-row{ flex:1; display:flex; flex-direction:row; min-height:0; gap:0; padding:0; }
+
+  .draw-container{ flex:1; display:flex; flex-direction:column; min-width:0; min-height:0; }
 
   .side-dock{
     flex:0 0 auto; width:140px; display:flex; flex-direction:column;
-    align-items:center; justify-content:center; gap:12px;
+    align-items:center; justify-content:center; gap:12px; padding:8px 0;
   }
-  .side-dock.left{ visibility:hidden; }
-  .side-dock.left.show{ visibility:visible; }
 
-  .canvas-wrap{ flex:1; min-width:0; display:flex; align-items:center; justify-content:center; padding:0; min-height:0; }
+  .canvas-wrap{ flex:1; min-width:0; display:flex; align-items:center; justify-content:center; padding:0; min-height:0; width:100%; }
   #canvasFrame{
     position:relative; background:var(--paper);
     border-radius:20px; box-shadow:0 8px 0 rgba(0,0,0,0.12);
@@ -121,12 +122,12 @@
   #outlineImg{ pointer-events:none; mix-blend-mode:multiply; }
 
   .color-row{
-    flex:0 0 auto; display:flex; gap:10px; align-items:center; justify-content:center; flex-wrap:wrap;
-    padding: 8px 10px max(8px, env(safe-area-inset-bottom)) 10px;
-    background:var(--paper); border-top-left-radius:24px; border-top-right-radius:24px;
+    flex:0 0 auto; display:flex; gap:10px; align-items:center; justify-content:flex-start; flex-wrap:nowrap;
+    padding: 8px 12px max(8px, env(safe-area-inset-bottom)) 12px;
+    background:var(--paper); border-top-left-radius:24px; border-top-right-radius:24px; overflow-x:auto;
   }
 
-  .tool-btn{ width:128px; height:128px; background:#8791A8; padding:16px; flex:0 0 auto; }
+  .tool-btn{ width:128px; height:128px; background:#8791A8; padding:16px; flex:0 0 auto; border-radius:32px; }
   .tool-btn svg{ width:76px; height:76px; }
   .tool-btn.selected{ background:var(--sky-deep); outline-color:var(--sun); transform:scale(1.05); }
 
@@ -178,69 +179,6 @@
   </div>
 
   <!-- ============ DRAW ============ -->
-  <div id="draw">
-    <div class="topbar">
-      <button class="sticker exit-btn" id="exitBtn">← Exit</button>
-      <div class="page-name" id="pageName">Cat</div>
-      <button class="sticker clear-btn" id="clearBtn">🧽 Wipe clean</button>
-    </div>
-
-    <div class="main-row">
-      <div class="side-dock left" id="shapesDock">
-        <button class="sticker shape-btn selected" data-shape="star">★</button>
-        <button class="sticker shape-btn" data-shape="heart">♥</button>
-        <button class="sticker shape-btn" data-shape="circle">●</button>
-        <button class="sticker shape-btn" data-shape="triangle">▲</button>
-      </div>
-
-      <div class="canvas-wrap">
-        <div id="canvasFrame">
-          <canvas id="drawCanvas"></canvas>
-          <img id="outlineImg" alt="">
-        </div>
-      </div>
-
-      <div class="side-dock right" id="toolsDock">
-        <button class="sticker tool-btn selected" data-tool="brush" title="Thick paintbrush">
-          <svg viewBox="0 0 48 48">
-            <rect x="0" y="0" width="9" height="20" rx="4" fill="#B5651D" transform="rotate(45 4.5 10)"/>
-            <rect x="8" y="12" width="11" height="9" rx="3" fill="#D9D9E3" transform="rotate(45 13.5 16.5)"/>
-            <path d="M16 22 C 10 26 6 32 9 40 C 13 44 20 42 23 35 L 30 20 L 22 16 Z" fill="#fff"/>
-            <circle cx="12" cy="37" r="5" fill="#FF6B6B"/>
-          </svg>
-        </button>
-        <button class="sticker tool-btn" data-tool="marker" title="Medium marker">
-          <svg viewBox="0 0 48 48">
-            <rect x="14" y="4" width="18" height="15" rx="5" fill="#F3722C"/>
-            <rect x="14" y="4" width="18" height="6" rx="3" fill="#fff" opacity="0.45"/>
-            <path d="M14 19 L14 27 L23 42 L32 27 L32 19 Z" fill="#2B2B33"/>
-          </svg>
-        </button>
-        <button class="sticker tool-btn" data-tool="crayon" title="Thin crayon">
-          <svg viewBox="0 0 48 48">
-            <path d="M10 40 L28 9 Q32 3 37 8 Q42 13 36 17 L15 41 Z" fill="#E63946"/>
-            <path d="M10 40 L15 41 L18 35 L13 33 Z" fill="#fff"/>
-            <line x1="18" y1="30" x2="28" y2="14" stroke="#fff" stroke-width="3.4" stroke-linecap="round"/>
-          </svg>
-        </button>
-        <button class="sticker tool-btn" data-tool="stamp" title="Stamps">
-          <svg viewBox="0 0 48 48">
-            <path d="M24 4 L29 17 L43 18 L32 27 L36 42 L24 33 L12 42 L16 27 L5 18 L19 17 Z" fill="#FFC93C"/>
-            <circle cx="18" cy="14" r="2.6" fill="#fff" opacity="0.85"/>
-          </svg>
-        </button>
-        <button class="sticker tool-btn" data-tool="eraser" title="Eraser">
-          <svg viewBox="0 0 48 48">
-            <path d="M8 30 L26 12 C 29 9 33 9 36 12 L40 16 C 43 19 43 23 40 26 L28 38 L12 38 C 9 38 7 36 7 34 Z" fill="#FF8FB1"/>
-            <path d="M12 38 L28 38 L21 31 L15 31 Z" fill="#E0638A"/>
-            <line x1="17" y1="21" x2="31" y2="35" stroke="#fff" stroke-width="2.6" opacity="0.65" stroke-linecap="round"/>
-          </svg>
-        </button>
-      </div>
-    </div>
-
-    <div class="color-row" id="colorRow"></div>
-  </div>
 
   <div class="modal-backdrop" id="clearModal">
     <div class="modal-card">
@@ -577,19 +515,43 @@ function renderColors(){
   });
 }
 
-document.querySelectorAll(".tool-btn").forEach(b=>{
+let currentZoom = 1;
+
+document.getElementById("zoomInBtn").addEventListener("click", ()=>{
+  currentZoom = Math.min(2.0, currentZoom + 0.15);
+  applyZoom();
+});
+document.getElementById("zoomOutBtn").addEventListener("click", ()=>{
+  currentZoom = Math.max(0.6, currentZoom - 0.15);
+  applyZoom();
+});
+
+function applyZoom(){
+  canvasFrame.style.transform = `scale(${currentZoom})`;
+  canvasFrame.style.transformOrigin = "center center";
+}
+
+document.querySelectorAll("#toolsDock .tool-btn").forEach(b=>{
   b.addEventListener("click", ()=>{
     currentTool = b.dataset.tool;
-    document.querySelectorAll(".tool-btn").forEach(el=>el.classList.remove("selected"));
-    b.classList.add("selected");
-    document.getElementById("shapesDock").classList.toggle("show", currentTool==="stamp");
+    if (currentTool === "stamp"){
+      document.getElementById("toolsDock").style.display = "none";
+      document.getElementById("shapesDock").style.display = "flex";
+    } else {
+      document.querySelectorAll("#toolsDock .tool-btn").forEach(el=>el.classList.remove("selected"));
+      b.classList.add("selected");
+    }
   });
 });
-document.querySelectorAll(".shape-btn").forEach(b=>{
+
+document.querySelectorAll("#shapesDock .shape-btn").forEach(b=>{
   b.addEventListener("click", ()=>{
     currentShape = b.dataset.shape;
-    document.querySelectorAll(".shape-btn").forEach(el=>el.classList.remove("selected"));
-    b.classList.add("selected");
+    document.getElementById("shapesDock").style.display = "none";
+    document.getElementById("toolsDock").style.display = "flex";
+    document.querySelectorAll("#toolsDock .tool-btn").forEach(el=>el.classList.remove("selected"));
+    const stampBtn = document.querySelector('#toolsDock [data-tool="stamp"]');
+    if (stampBtn) stampBtn.classList.add("selected");
   });
 });
 
@@ -622,7 +584,8 @@ window.addEventListener("resize", ()=>{ if(currentPageId) sizeCanvasFrame(); });
 /* ---------- Open / exit a page ---------- */
 function openPage(page){
   currentPageId = page.id;
-  document.getElementById("pageName").textContent = page.name;
+  currentZoom = 1;
+  applyZoom();
   document.getElementById("home").style.display = "none";
   document.getElementById("draw").classList.add("active");
 
