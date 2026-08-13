@@ -102,6 +102,9 @@
   .exit-btn{ background:var(--coral); font-size:16px; padding:12px 20px; height:52px; }
   .zoom-controls{ display:flex; gap:10px; align-items:center; }
   .zoom-btn{ background:var(--sky-deep); font-size:24px; width:52px; height:52px; }
+  .right-controls{ display:flex; gap:10px; align-items:center; }
+  .undo-btn{ background:#8791A8; font-size:14px; padding:12px 18px; height:52px; }
+  .undo-btn.disabled{ opacity:0.4; pointer-events:none; }
   .clear-btn{ background:#6C757D; font-size:14px; padding:12px 18px; height:52px; }
 
   .main-row{ flex:1; display:flex; flex-direction:row; min-height:0; gap:0; padding:0; }
@@ -178,7 +181,7 @@
     </div>
     <div class="dots" id="dots"></div>
 
-    <input type="file" id="pdfInput" accept="application/pdf,image/png,image/jpeg,image/jpg,image/webp" style="display:none;">
+    <input type="file" id="pdfInput" accept="application/pdf,image/png,image/jpeg,image/jpg,image/webp" multiple style="display:none;">
   </div>
 
   <!-- ============ DRAW ============ -->
@@ -189,7 +192,10 @@
         <button class="sticker zoom-btn" id="zoomOutBtn">−</button>
         <button class="sticker zoom-btn" id="zoomInBtn">+</button>
       </div>
-      <button class="sticker clear-btn" id="clearBtn">🧽 Wipe clean</button>
+      <div class="right-controls">
+        <button class="sticker undo-btn disabled" id="undoBtn" title="Undo">↺ Undo</button>
+        <button class="sticker clear-btn" id="clearBtn">🧽 Wipe clean</button>
+      </div>
     </div>
 
     <div class="main-row">
@@ -306,6 +312,9 @@ let currentColor = COLORS[0].v;
 let drawing = false;
 let lastPt = null;
 let lastStampPt = null;
+let lastDabPt = null;
+let undoStack = [];
+const UNDO_MAX = 15;
 
 const drawCanvas = document.getElementById("drawCanvas");
 const ctx = drawCanvas.getContext("2d");
@@ -534,6 +543,8 @@ function openPage(page){
   currentPageId = page.id;
   currentZoom = 1;
   applyZoom();
+  undoStack = [];
+  updateUndoBtnState();
   document.getElementById("home").style.display = "none";
   document.getElementById("draw").classList.add("active");
 
@@ -556,6 +567,32 @@ function saveProgress(){
   catch(e){ console.warn("Could not save progress", e); }
 }
 
+function updateUndoBtnState(){
+  document.getElementById("undoBtn").classList.toggle("disabled", undoStack.length === 0);
+}
+
+function pushUndoSnapshot(){
+  try{
+    undoStack.push(drawCanvas.toDataURL("image/png"));
+    if (undoStack.length > UNDO_MAX) undoStack.shift();
+    updateUndoBtnState();
+  }catch(e){ console.warn("Could not capture undo snapshot", e); }
+}
+
+function performUndo(){
+  if (undoStack.length === 0) return;
+  const prev = undoStack.pop();
+  const img = new Image();
+  img.onload = ()=>{
+    ctx.clearRect(0,0,drawCanvas.width,drawCanvas.height);
+    ctx.drawImage(img, 0,0, drawCanvas.width, drawCanvas.height);
+    saveProgress();
+    updateUndoBtnState();
+  };
+  img.src = prev;
+}
+document.getElementById("undoBtn").addEventListener("click", performUndo);
+
 document.getElementById("exitBtn").addEventListener("click", ()=>{
   saveProgress();
   document.getElementById("draw").classList.remove("active");
@@ -573,6 +610,7 @@ document.getElementById("cancelClear").addEventListener("click", ()=>{
   document.getElementById("clearModal").classList.remove("show");
 });
 document.getElementById("confirmClear").addEventListener("click", ()=>{
+  pushUndoSnapshot();
   ctx.clearRect(0,0,drawCanvas.width,drawCanvas.height);
   saveProgress();
   document.getElementById("clearModal").classList.remove("show");
@@ -593,27 +631,85 @@ function getPoint(evt){
 }
 
 const TOOL_WIDTH = { brush:92, marker:52, crayon:24 };
-const TOOL_OPACITY = { brush:0.85, marker:1.0, crayon:0.75 };
+const TOOL_OPACITY = { brush:0.92, marker:1.0, crayon:0.88 };
+const TOOL_MIXWEIGHT = { brush:0.5, marker:0.55, crayon:0.55 };
+
+function hexToRgb(hex){
+  const v = parseInt(hex.slice(1),16);
+  return [(v>>16)&255, (v>>8)&255, v&255];
+}
+
+/* Paints one round "dab": where the canvas already has paint, blend the new
+   color into what's there (so red over blue makes purple, like real paint);
+   where it's blank, lay the new color down at the tool's normal opacity.
+   Stamping dabs along the path (instead of one continuous ctx.stroke per
+   mousemove segment) avoids the dark overlap blotches you get from drawing
+   lots of small translucent strokes that cross back over each other. */
+function paintDab(cx, cy, radius, rgb, opacity, mixWeight){
+  const x0 = Math.max(0, Math.floor(cx-radius));
+  const y0 = Math.max(0, Math.floor(cy-radius));
+  const x1 = Math.min(drawCanvas.width, Math.ceil(cx+radius));
+  const y1 = Math.min(drawCanvas.height, Math.ceil(cy+radius));
+  const w = x1-x0, h = y1-y0;
+  if (w<=0||h<=0) return;
+  const imgData = ctx.getImageData(x0,y0,w,h);
+  const data = imgData.data;
+  const r2 = radius*radius;
+  const nr=rgb[0], ng=rgb[1], nb=rgb[2];
+  const newAlpha = Math.round(255*opacity);
+  for(let yy=0; yy<h; yy++){
+    const dy = (y0+yy+0.5) - cy;
+    const dy2 = dy*dy;
+    const rowBase = yy*w;
+    for(let xx=0; xx<w; xx++){
+      const dx = (x0+xx+0.5) - cx;
+      if (dx*dx+dy2 > r2) continue;
+      const idx = (rowBase+xx)*4;
+      const a = data[idx+3];
+      if (a > 10){
+        data[idx]   = (data[idx]  *(1-mixWeight) + nr*mixWeight) | 0;
+        data[idx+1] = (data[idx+1]*(1-mixWeight) + ng*mixWeight) | 0;
+        data[idx+2] = (data[idx+2]*(1-mixWeight) + nb*mixWeight) | 0;
+        data[idx+3] = 255;
+      } else {
+        data[idx]=nr; data[idx+1]=ng; data[idx+2]=nb; data[idx+3]=newAlpha;
+      }
+    }
+  }
+  ctx.putImageData(imgData, x0, y0);
+}
+
+function paintTexture(cx,cy,radius,rgb,mixW){
+  for(let i=0;i<2;i++){
+    const jx=(Math.random()-0.5)*radius*0.6, jy=(Math.random()-0.5)*radius*0.6;
+    paintDab(cx+jx, cy+jy, radius*0.5, rgb, 0.4, mixW*0.6);
+  }
+}
 
 function paintAlongSegment(p0, p1, tool){
-  ctx.save();
-  ctx.lineCap = "round";
-  ctx.lineJoin = "round";
-  ctx.lineWidth = TOOL_WIDTH[tool];
-  ctx.strokeStyle = currentColor;
-  ctx.globalAlpha = TOOL_OPACITY[tool];
+  const radius = TOOL_WIDTH[tool]/2;
+  const rgb = hexToRgb(currentColor);
+  const opacity = TOOL_OPACITY[tool];
+  const mixW = TOOL_MIXWEIGHT[tool];
+  const spacing = Math.max(radius*0.35, 3);
 
-  if (tool === "crayon") {
-    ctx.setLineDash([4, 12]);
-  } else {
-    ctx.setLineDash([]);
+  if (!lastDabPt){
+    paintDab(p1.x, p1.y, radius, rgb, opacity, mixW);
+    if (tool === "crayon") paintTexture(p1.x,p1.y,radius,rgb,mixW);
+    lastDabPt = {x:p1.x, y:p1.y};
+    return;
   }
-
-  ctx.beginPath();
-  ctx.moveTo(p0.x, p0.y);
-  ctx.lineTo(p1.x, p1.y);
-  ctx.stroke();
-  ctx.restore();
+  let dx = p1.x-lastDabPt.x, dy = p1.y-lastDabPt.y;
+  let dist = Math.hypot(dx,dy);
+  while (dist >= spacing){
+    const t = spacing/dist;
+    const nx = lastDabPt.x + dx*t, ny = lastDabPt.y + dy*t;
+    paintDab(nx, ny, radius, rgb, opacity, mixW);
+    if (tool === "crayon") paintTexture(nx,ny,radius,rgb,mixW);
+    lastDabPt = {x:nx, y:ny};
+    dx = p1.x-lastDabPt.x; dy = p1.y-lastDabPt.y;
+    dist = Math.hypot(dx,dy);
+  }
 }
 
 function eraseSegment(p0,p1){
@@ -656,6 +752,7 @@ function drawShape(cx, cy, shape, size, color){
 function handleStart(evt){
   evt.preventDefault();
   drawing = true;
+  pushUndoSnapshot();
   const p = getPoint(evt);
   lastPt = p;
   lastDabPt = null;
@@ -709,62 +806,97 @@ document.addEventListener("visibilitychange", ()=>{ if(document.hidden) saveProg
 document.getElementById("importBtn").addEventListener("click", ()=>{
   document.getElementById("pdfInput").click();
 });
-document.getElementById("pdfInput").addEventListener("change", async (e)=>{
-  const file = e.target.files[0];
-  if (!file) return;
-  try{
-    let outlineData;
-    if (file.type === "application/pdf"){
-      if (!window.pdfjsLib){
-        alert("Could not load the PDF reader. Please check your internet connection and try again.");
-        return;
-      }
-      const buf = await file.arrayBuffer();
-      const pdf = await pdfjsLib.getDocument({data:buf}).promise;
-      const page = await pdf.getPage(1);
-      const viewport = page.getViewport({scale: 2});
-      const tmp = document.createElement("canvas");
-      tmp.width = viewport.width; tmp.height = viewport.height;
-      await page.render({canvasContext: tmp.getContext("2d"), viewport}).promise;
-      outlineData = tmp.toDataURL("image/png");
-    } else if (file.type.startsWith("image/")){
-      const rawDataUrl = await new Promise((res, rej)=>{
-        const reader = new FileReader();
-        reader.onload = ()=>res(reader.result);
-        reader.onerror = rej;
-        reader.readAsDataURL(file);
-      });
-      const img = await new Promise((res, rej)=>{
-        const im = new Image();
-        im.onload = ()=>res(im);
-        im.onerror = rej;
-        im.src = rawDataUrl;
-      });
-      const maxDim = 1400;
-      let w = img.width, h = img.height;
-      if (w > maxDim || h > maxDim){
-        const scale = maxDim / Math.max(w,h);
-        w = Math.round(w*scale); h = Math.round(h*scale);
-      }
-      const tmp = document.createElement("canvas");
-      tmp.width = w; tmp.height = h;
-      tmp.getContext("2d").drawImage(img, 0, 0, w, h);
-      outlineData = tmp.toDataURL("image/png");
-    } else {
-      alert("Please choose a PDF or image file.");
-      return;
+async function fileToOutlineData(file){
+  if (file.type === "application/pdf"){
+    if (!window.pdfjsLib){
+      throw new Error("PDF reader not available");
     }
+    const buf = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({data:buf}).promise;
+    const page = await pdf.getPage(1);
+    const viewport = page.getViewport({scale: 2});
+    const tmp = document.createElement("canvas");
+    tmp.width = viewport.width; tmp.height = viewport.height;
+    await page.render({canvasContext: tmp.getContext("2d"), viewport}).promise;
+    return tmp.toDataURL("image/png");
+  } else if (file.type.startsWith("image/")){
+    const rawDataUrl = await new Promise((res, rej)=>{
+      const reader = new FileReader();
+      reader.onload = ()=>res(reader.result);
+      reader.onerror = rej;
+      reader.readAsDataURL(file);
+    });
+    const img = await new Promise((res, rej)=>{
+      const im = new Image();
+      im.onload = ()=>res(im);
+      im.onerror = rej;
+      im.src = rawDataUrl;
+    });
+    const maxDim = 1400;
+    let w = img.width, h = img.height;
+    if (w > maxDim || h > maxDim){
+      const scale = maxDim / Math.max(w,h);
+      w = Math.round(w*scale); h = Math.round(h*scale);
+    }
+    const tmp = document.createElement("canvas");
+    tmp.width = w; tmp.height = h;
+    tmp.getContext("2d").drawImage(img, 0, 0, w, h);
+    return tmp.toDataURL("image/png");
+  } else {
+    throw new Error("Unsupported file type: " + file.type);
+  }
+}
 
-    const id = "page_" + Date.now();
-    const name = file.name.replace(/\.[^.]+$/,"").slice(0,20) || "Imported";
+document.getElementById("pdfInput").addEventListener("change", async (e)=>{
+  const files = Array.from(e.target.files || []);
+  if (!files.length) return;
+
+  const importBtn = document.getElementById("importBtn");
+  const isBulk = files.length > 1;
+  if (isBulk){
+    importBtn.style.pointerEvents = "none";
+    importBtn.style.opacity = "0.6";
+  }
+
+  const imported = [];
+  let failCount = 0;
+
+  for (const file of files){
+    try{
+      const outlineData = await fileToOutlineData(file);
+      const id = "page_" + Date.now() + "_" + Math.random().toString(36).slice(2,7);
+      const name = file.name.replace(/\.[^.]+$/,"").slice(0,20) || "Imported";
+      imported.push({id, name, outline: outlineData, createdAt: Date.now()});
+    }catch(err){
+      console.error(err);
+      failCount++;
+    }
+  }
+
+  if (imported.length){
     const list = store.get(CUSTOM_KEY, []);
-    list.push({id, name, outline: outlineData, createdAt: Date.now()});
+    list.push(...imported);
     store.set(CUSTOM_KEY, list);
-    e.target.value = "";
-    openPage({id, name, custom:true, outline: outlineData});
-  }catch(err){
-    console.error(err);
+  }
+
+  e.target.value = "";
+  if (isBulk){
+    importBtn.style.pointerEvents = "";
+    importBtn.style.opacity = "";
+  }
+
+  if (!imported.length){
     alert("That file couldn't be opened. Please choose a PDF or image coloring page.");
+    return;
+  }
+  if (failCount){
+    alert(`${imported.length} page${imported.length===1?'':'s'} imported. ${failCount} file${failCount===1?'':'s'} couldn't be opened.`);
+  }
+
+  if (imported.length === 1 && !failCount){
+    openPage(imported[0]);
+  } else {
+    renderHome(imported[0].id);
   }
 });
 
