@@ -577,6 +577,11 @@ document.getElementById("confirmClear").addEventListener("click", ()=>{
   saveProgress();
   document.getElementById("clearModal").classList.remove("show");
 });
+document.getElementById("clearModal").addEventListener("click", (e)=>{
+  if (e.target.id === "clearModal") {
+    document.getElementById("clearModal").classList.remove("show");
+  }
+});
 
 /* ---------- Drawing engine ---------- */
 function getPoint(evt){
@@ -763,12 +768,7 @@ document.getElementById("pdfInput").addEventListener("change", async (e)=>{
   }
 });
 
-/* ---------- Init ---------- */
-renderColors();
-renderHome();
-let pendingDeleteId = null;
-let currentMathAnswer = 0;
-
+/* ---------- Delete Modal & Parent Gate ---------- */
 let pendingDeleteId = null;
 let currentMathAnswer = 0;
 
@@ -789,7 +789,7 @@ function openDeleteModal(pageId){
   document.getElementById("deleteModal").classList.add("show");
 }
 
-/* Close modal when clicking on the dark backdrop outside the card */
+/* Close modal when clicking backdrop outside card */
 document.getElementById("deleteModal").addEventListener("click", (e)=>{
   if (e.target.id === "deleteModal") {
     closeDeleteModal();
@@ -809,32 +809,15 @@ document.getElementById("confirmDelete").addEventListener("click", ()=>{
     }
     closeDeleteModal();
   } else {
-    /* Show inline error text without popping up an alert modal */
     document.getElementById("deleteErrorMsg").style.display = "block";
     document.getElementById("deleteMathAnswer").value = "";
     document.getElementById("deleteMathAnswer").focus();
   }
 });
 
-document.getElementById("cancelDelete").addEventListener("click", ()=>{
-  document.getElementById("deleteModal").classList.remove("show");
-  pendingDeleteId = null;
-});
-
-document.getElementById("confirmDelete").addEventListener("click", ()=>{
-  const input = parseInt(document.getElementById("deleteMathAnswer").value, 10);
-  if (input === currentMathAnswer){
-    if (pendingDeleteId){
-      const updated = store.get(CUSTOM_KEY, []).filter(x=>x.id!==pendingDeleteId);
-      store.set(CUSTOM_KEY, updated);
-      localStorage.removeItem(strokesKey(pendingDeleteId));
-      renderHome();
-    }
-    document.getElementById("deleteModal").classList.remove("show");
-  } else {
-    alert("Incorrect answer. Image not deleted.");
-  }
-});
+/* ---------- Init ---------- */
+renderColors();
+renderHome();
   
 // Comment these out while active testing:
 //if ("serviceWorker" in navigator){
