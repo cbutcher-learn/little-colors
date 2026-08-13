@@ -292,7 +292,6 @@ let currentColor = COLORS[0].v;
 let drawing = false;
 let lastPt = null;
 let lastStampPt = null;
-let lastDabPt = null;
 let undoStack = [];
 const UNDO_MAX = 15;
 
@@ -611,85 +610,22 @@ function getPoint(evt){
 }
 
 const TOOL_WIDTH = { brush:92, marker:52, crayon:24 };
-const TOOL_OPACITY = { brush:0.92, marker:1.0, crayon:0.88 };
-const TOOL_MIXWEIGHT = { brush:0.5, marker:0.55, crayon:0.55 };
 
-function hexToRgb(hex){
-  const v = parseInt(hex.slice(1),16);
-  return [(v>>16)&255, (v>>8)&255, v&255];
-}
-
-/* Paints one round "dab": where the canvas already has paint, blend the new
-   color into what's there (so red over blue makes purple, like real paint);
-   where it's blank, lay the new color down at the tool's normal opacity.
-   Stamping dabs along the path (instead of one continuous ctx.stroke per
-   mousemove segment) avoids the dark overlap blotches you get from drawing
-   lots of small translucent strokes that cross back over each other. */
-function paintDab(cx, cy, radius, rgb, opacity, mixWeight){
-  const x0 = Math.max(0, Math.floor(cx-radius));
-  const y0 = Math.max(0, Math.floor(cy-radius));
-  const x1 = Math.min(drawCanvas.width, Math.ceil(cx+radius));
-  const y1 = Math.min(drawCanvas.height, Math.ceil(cy+radius));
-  const w = x1-x0, h = y1-y0;
-  if (w<=0||h<=0) return;
-  const imgData = ctx.getImageData(x0,y0,w,h);
-  const data = imgData.data;
-  const r2 = radius*radius;
-  const nr=rgb[0], ng=rgb[1], nb=rgb[2];
-  const newAlpha = Math.round(255*opacity);
-  for(let yy=0; yy<h; yy++){
-    const dy = (y0+yy+0.5) - cy;
-    const dy2 = dy*dy;
-    const rowBase = yy*w;
-    for(let xx=0; xx<w; xx++){
-      const dx = (x0+xx+0.5) - cx;
-      if (dx*dx+dy2 > r2) continue;
-      const idx = (rowBase+xx)*4;
-      const a = data[idx+3];
-      if (a > 10){
-        data[idx]   = (data[idx]  *(1-mixWeight) + nr*mixWeight) | 0;
-        data[idx+1] = (data[idx+1]*(1-mixWeight) + ng*mixWeight) | 0;
-        data[idx+2] = (data[idx+2]*(1-mixWeight) + nb*mixWeight) | 0;
-        data[idx+3] = 255;
-      } else {
-        data[idx]=nr; data[idx+1]=ng; data[idx+2]=nb; data[idx+3]=newAlpha;
-      }
-    }
-  }
-  ctx.putImageData(imgData, x0, y0);
-}
-
-function paintTexture(cx,cy,radius,rgb,mixW){
-  for(let i=0;i<2;i++){
-    const jx=(Math.random()-0.5)*radius*0.6, jy=(Math.random()-0.5)*radius*0.6;
-    paintDab(cx+jx, cy+jy, radius*0.5, rgb, 0.4, mixW*0.6);
-  }
-}
-
+/* Simple, direct strokes: new color fully covers whatever was underneath.
+   No pixel-level blending, no getImageData/putImageData — just a standard
+   canvas stroke per segment. This is the most reliable, best-performing
+   approach and avoids any mixing-related rendering glitches. */
 function paintAlongSegment(p0, p1, tool){
-  const radius = TOOL_WIDTH[tool]/2;
-  const rgb = hexToRgb(currentColor);
-  const opacity = TOOL_OPACITY[tool];
-  const mixW = TOOL_MIXWEIGHT[tool];
-  const spacing = Math.max(radius*0.35, 3);
-
-  if (!lastDabPt){
-    paintDab(p1.x, p1.y, radius, rgb, opacity, mixW);
-    if (tool === "crayon") paintTexture(p1.x,p1.y,radius,rgb,mixW);
-    lastDabPt = {x:p1.x, y:p1.y};
-    return;
-  }
-  let dx = p1.x-lastDabPt.x, dy = p1.y-lastDabPt.y;
-  let dist = Math.hypot(dx,dy);
-  while (dist >= spacing){
-    const t = spacing/dist;
-    const nx = lastDabPt.x + dx*t, ny = lastDabPt.y + dy*t;
-    paintDab(nx, ny, radius, rgb, opacity, mixW);
-    if (tool === "crayon") paintTexture(nx,ny,radius,rgb,mixW);
-    lastDabPt = {x:nx, y:ny};
-    dx = p1.x-lastDabPt.x; dy = p1.y-lastDabPt.y;
-    dist = Math.hypot(dx,dy);
-  }
+  ctx.globalCompositeOperation = "source-over";
+  ctx.globalAlpha = 1;
+  ctx.strokeStyle = currentColor;
+  ctx.lineWidth = TOOL_WIDTH[tool];
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  ctx.beginPath();
+  ctx.moveTo(p0.x, p0.y);
+  ctx.lineTo(p1.x, p1.y);
+  ctx.stroke();
 }
 
 function eraseSegment(p0,p1){
@@ -735,7 +671,6 @@ function handleStart(evt){
   pushUndoSnapshot();
   const p = getPoint(evt);
   lastPt = p;
-  lastDabPt = null;
   if (currentTool === "stamp"){
     const scale = drawCanvas.width/800;
     drawShape(p.x, p.y, currentShape, 90*Math.max(scale,0.5), currentColor);
@@ -768,7 +703,7 @@ function handleMove(evt){
 }
 function handleEnd(){
   if (!drawing) return;
-  drawing = false; lastPt = null; lastStampPt = null; lastDabPt = null;
+  drawing = false; lastPt = null; lastStampPt = null;
   saveProgress();
 }
 
