@@ -68,7 +68,25 @@
   }
   .page-card .art{ width:82%; height:78%; position:relative; }
   .page-card .art .strokes-img{ position:absolute; inset:0; width:100%; height:100%; object-fit:contain; }
-  .page-card .art .outline-img, .page-card .art .outline-svg{ position:absolute; inset:0; width:100%; height:100%; object-fit:contain; mix-blend-mode:multiply; pointer-events:none; }
+  .page-card .art .outline-img,
+.page-card .art .outline-svg{
+  position:absolute;
+  inset:0;
+  width:100%;
+  height:100%;
+  object-fit:contain;
+  mix-blend-mode:multiply;
+  pointer-events:none;
+}
+
+.page-card .art .outline-img{
+  opacity:0;
+  transition:opacity .08s ease;
+}
+
+.page-card .art .outline-img.loaded{
+  opacity:1;
+}
   .page-card .art .outline-svg svg{ width:100%; height:100%; display:block; }
   .page-card .name{ font-size:17px; font-weight:800; margin-top:4px; }
   .page-card .dot{ position:absolute; top:12px; right:12px; width:14px; height:14px; border-radius:50%; background:var(--leaf); box-shadow:0 0 0 3px #fff; display:none; z-index:2; }
@@ -315,29 +333,68 @@ function buildCard(p, isClone){
   const card = document.createElement("div");
   card.className = "page-card" + (hasProgress(p.id) ? " has-progress" : "");
   card.dataset.id = p.id;
-  const savedStrokes = hasProgress(p.id) ? store.get(strokesKey(p.id)) : null;
-  const outlineHtml = p.custom
-    ? `<img class="outline-img" src="${p.outline}" decoding="sync" loading="eager" alt="">`
-    : `<div class="outline-svg">${OUTLINES[p.id]}</div>`;
+
+  const savedStrokes = hasProgress(p.id)
+    ? store.get(strokesKey(p.id))
+    : null;
+
   card.innerHTML = `
     ${(p.custom && !isClone) ? '<button class="del">✕</button>' : ''}
     <div class="dot"></div>
-    <div class="art">
-      ${savedStrokes ? `<img class="strokes-img" src="${savedStrokes}" alt="">` : ''}
-      ${outlineHtml}
-    </div>
+    <div class="art"></div>
     <div class="name">${p.name}</div>
   `;
+
+  const art = card.querySelector(".art");
+
+  // Add saved coloring first, if there is any.
+  if (savedStrokes) {
+    const strokesImg = new Image();
+    strokesImg.className = "strokes-img";
+    strokesImg.alt = "";
+    strokesImg.decoding = "async";
+    strokesImg.src = savedStrokes;
+    art.appendChild(strokesImg);
+  }
+
+  if (p.custom) {
+    // Show a stable placeholder until Safari has actually
+    // loaded the imported image.
+    const outlineImg = new Image();
+    outlineImg.className = "outline-img";
+    outlineImg.alt = "";
+    outlineImg.decoding = "async";
+
+    outlineImg.onload = () => {
+      outlineImg.classList.add("loaded");
+    };
+
+    outlineImg.onerror = () => {
+      console.warn("Could not display imported page:", p.name);
+      outlineImg.remove();
+    };
+
+    outlineImg.src = p.outline;
+    art.appendChild(outlineImg);
+  } else {
+    const outline = document.createElement("div");
+    outline.className = "outline-svg";
+    outline.innerHTML = OUTLINES[p.id] || "";
+    art.appendChild(outline);
+  }
+
   card.addEventListener("click", (e)=>{
     if (e.target.closest(".del")) return;
     openPage(p);
   });
+
   if (p.custom && !isClone){
     card.querySelector(".del").addEventListener("click", (e)=>{
       e.stopPropagation();
       openDeleteModal(p.id);
     });
   }
+
   return card;
 }
 
@@ -494,26 +551,42 @@ document.querySelectorAll("#shapesDock .shape-btn").forEach(b=>{
 /* ---------- Canvas sizing ---------- */
 function sizeCanvasFrame(){
   const wrap = document.querySelector(".canvas-wrap");
+  if (!wrap) return;
+
   const wW = wrap.clientWidth;
   const wH = wrap.clientHeight;
-  const targetRatio = 4/3;
-  let w = wW, h = w/targetRatio;
-  if (h > wH){ h = wH; w = h*targetRatio; }
-  canvasFrame.style.width = w+"px";
-  canvasFrame.style.height = h+"px";
 
-  const prevW = drawCanvas.width, prevH = drawCanvas.height;
-  const snapshot = (prevW && prevH) ? ctx.getImageData(0,0,prevW,prevH) : null;
-  const dpr = window.devicePixelRatio || 1;
-  drawCanvas.width = Math.round(w*dpr);
-  drawCanvas.height = Math.round(h*dpr);
-  ctx.setTransform(1,0,0,1,0,0);
-  if (snapshot){
-    const tmp = document.createElement("canvas");
-    tmp.width = prevW; tmp.height = prevH;
-    tmp.getContext("2d").putImageData(snapshot,0,0);
-    ctx.drawImage(tmp, 0,0, drawCanvas.width, drawCanvas.height);
+  const targetRatio = 4 / 3;
+
+  let w = wW;
+  let h = w / targetRatio;
+
+  if (h > wH){
+    h = wH;
+    w = h * targetRatio;
   }
+
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+
+  const newWidth = Math.round(w * dpr);
+  const newHeight = Math.round(h * dpr);
+
+  canvasFrame.style.width = w + "px";
+  canvasFrame.style.height = h + "px";
+
+  // Don't resize the actual canvas if its pixel dimensions
+  // are already correct. Resizing a canvas destroys its contents.
+  if (
+    drawCanvas.width === newWidth &&
+    drawCanvas.height === newHeight
+  ){
+    return;
+  }
+
+  drawCanvas.width = newWidth;
+  drawCanvas.height = newHeight;
+
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
 }
 window.addEventListener("resize", ()=>{ if(currentPageId) sizeCanvasFrame(); });
 
@@ -527,11 +600,14 @@ function openPage(page){
   document.getElementById("home").style.display = "none";
   document.getElementById("draw").classList.add("active");
 
-  outlineImg.src = page.custom ? page.outline : ("data:image/svg+xml;utf8," + encodeURIComponent(OUTLINES[page.id]));
+  outlineImg.src = page.custom
+  ? page.outline
+  : ("data:image/svg+xml;utf8," + encodeURIComponent(OUTLINES[page.id]));
 
+requestAnimationFrame(() => {
   sizeCanvasFrame();
 
-  const saved = store.get(strokesKey(page.id), null);
+});
   ctx.clearRect(0,0,drawCanvas.width,drawCanvas.height);
   if (saved){
     const img = new Image();
@@ -552,7 +628,7 @@ function updateUndoBtnState(){
 
 function pushUndoSnapshot(){
   try{
-    undoStack.push(drawCanvas.toDataURL("image/png"));
+    undoStack.push(drawCanvas.toDataURL("image/jpeg", 0.85));
     if (undoStack.length > UNDO_MAX) undoStack.shift();
     updateUndoBtnState();
   }catch(e){ console.warn("Could not capture undo snapshot", e); }
@@ -711,9 +787,6 @@ canvasFrame.addEventListener("pointerdown", handleStart);
 canvasFrame.addEventListener("pointermove", handleMove);
 window.addEventListener("pointerup", handleEnd);
 window.addEventListener("pointercancel", handleEnd);
-canvasFrame.addEventListener("touchstart", handleStart, {passive:false});
-canvasFrame.addEventListener("touchmove", handleMove, {passive:false});
-canvasFrame.addEventListener("touchend", handleEnd, {passive:false});
 
 document.addEventListener("visibilitychange", ()=>{ if(document.hidden) saveProgress(); });
 
@@ -749,16 +822,22 @@ async function fileToOutlineData(file){
       im.onerror = rej;
       im.src = rawDataUrl;
     });
-    const maxDim = 1400;
+    const maxDim = 1000;
     let w = img.width, h = img.height;
     if (w > maxDim || h > maxDim){
       const scale = maxDim / Math.max(w,h);
       w = Math.round(w*scale); h = Math.round(h*scale);
     }
     const tmp = document.createElement("canvas");
-    tmp.width = w; tmp.height = h;
-    tmp.getContext("2d").drawImage(img, 0, 0, w, h);
-    dataUrl = tmp.toDataURL("image/png");
+    tmp.width = w;
+    tmp.height = h;
+    
+    const tmpCtx = tmp.getContext("2d", { alpha: false });
+    tmpCtx.fillStyle = "#FFFFFF";
+    tmpCtx.fillRect(0, 0, w, h);
+    tmpCtx.drawImage(img, 0, 0, w, h);
+    
+    dataUrl = tmp.toDataURL("image/jpeg", 0.85);
   } else {
     throw new Error("Unsupported file type: " + file.type);
   }
