@@ -253,7 +253,8 @@
   <div class="modal-backdrop" id="deleteModal">
     <div class="modal-card">
       <p id="deleteGateText">Adult Gate: What is 7 + 5?</p>
-      <input type="number" id="deleteMathAnswer" style="font-size:20px; width:80px; text-align:center; margin-bottom:16px; padding:6px; border-radius:8px; border:2px solid #ccc;">
+      <input type="number" id="deleteMathAnswer" inputmode="numeric" style="font-size:24px; width:100px; text-align:center; margin-bottom:12px; padding:8px; border-radius:12px; border:3px solid var(--sky-deep);">
+      <p id="deleteErrorMsg" style="color:var(--coral); font-size:14px; margin:0 0 12px 0; display:none;">Incorrect answer, try again!</p>
       <div class="modal-actions">
         <button class="sticker btn-yes" id="confirmDelete">Delete Page</button>
         <button class="sticker btn-no" id="cancelDelete">Cancel</button>
@@ -586,86 +587,28 @@ function getPoint(evt){
   return { x:(t.clientX-rect.left)*scaleX, y:(t.clientY-rect.top)*scaleY };
 }
 
-/* Doubled thicknesses (diameter in canvas px) */
-const TOOL_WIDTH = { brush:92, marker:52, crayon:20 };
-const TOOL_OPACITY = { brush:0.92, marker:1, crayon:0.88 };
-const TOOL_MIXWEIGHT = { brush:0.5, marker:0.55, crayon:0.55 };
-
-function hexToRgb(hex){
-  const v = parseInt(hex.slice(1),16);
-  return [(v>>16)&255, (v>>8)&255, v&255];
-}
-
-/* Paints one round "dab": where canvas already has paint, blend the new color
-   into the existing color (like real paint mixing); where it's blank, lay
-   down the new color at the tool's normal opacity. */
-function paintDab(cx, cy, radius, rgb, opacity, mixWeight){
-  const x0 = Math.max(0, Math.floor(cx-radius));
-  const y0 = Math.max(0, Math.floor(cy-radius));
-  const x1 = Math.min(drawCanvas.width, Math.ceil(cx+radius));
-  const y1 = Math.min(drawCanvas.height, Math.ceil(cy+radius));
-  const w = x1-x0, h = y1-y0;
-  if (w<=0||h<=0) return;
-  const imgData = ctx.getImageData(x0,y0,w,h);
-  const data = imgData.data;
-  const r2 = radius*radius;
-  const nr=rgb[0], ng=rgb[1], nb=rgb[2];
-  const newAlpha = Math.round(255*opacity);
-  for(let yy=0; yy<h; yy++){
-    const dy = (y0+yy+0.5) - cy;
-    const dy2 = dy*dy;
-    const rowBase = yy*w;
-    for(let xx=0; xx<w; xx++){
-      const dx = (x0+xx+0.5) - cx;
-      if (dx*dx+dy2 > r2) continue;
-      const idx = (rowBase+xx)*4;
-      const a = data[idx+3];
-      if (a > 10){
-        data[idx]   = (data[idx]  *(1-mixWeight) + nr*mixWeight) | 0;
-        data[idx+1] = (data[idx+1]*(1-mixWeight) + ng*mixWeight) | 0;
-        data[idx+2] = (data[idx+2]*(1-mixWeight) + nb*mixWeight) | 0;
-        data[idx+3] = 255;
-      } else {
-        data[idx]=nr; data[idx+1]=ng; data[idx+2]=nb; data[idx+3]=newAlpha;
-      }
-    }
-  }
-  ctx.putImageData(imgData, x0, y0);
-}
-
-let lastDabPt = null;
-
-function paintTexture(cx,cy,radius,rgb,mixW){
-  for(let i=0;i<2;i++){
-    const jx=(Math.random()-0.5)*radius*0.6, jy=(Math.random()-0.5)*radius*0.6;
-    paintDab(cx+jx, cy+jy, radius*0.5, rgb, 0.4, mixW*0.6);
-  }
-}
+const TOOL_WIDTH = { brush:92, marker:52, crayon:24 };
+const TOOL_OPACITY = { brush:0.85, marker:1.0, crayon:0.75 };
 
 function paintAlongSegment(p0, p1, tool){
-  const radius = TOOL_WIDTH[tool]/2;
-  const rgb = hexToRgb(currentColor);
-  const opacity = TOOL_OPACITY[tool];
-  const mixW = TOOL_MIXWEIGHT[tool];
-  const spacing = Math.max(radius*0.35, 3);
+  ctx.save();
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  ctx.lineWidth = TOOL_WIDTH[tool];
+  ctx.strokeStyle = currentColor;
+  ctx.globalAlpha = TOOL_OPACITY[tool];
 
-  if (!lastDabPt){
-    paintDab(p1.x, p1.y, radius, rgb, opacity, mixW);
-    if (tool === "crayon") paintTexture(p1.x,p1.y,radius,rgb,mixW);
-    lastDabPt = {x:p1.x, y:p1.y};
-    return;
+  if (tool === "crayon") {
+    ctx.setLineDash([4, 12]);
+  } else {
+    ctx.setLineDash([]);
   }
-  let dx = p1.x-lastDabPt.x, dy = p1.y-lastDabPt.y;
-  let dist = Math.hypot(dx,dy);
-  while (dist >= spacing){
-    const t = spacing/dist;
-    const nx = lastDabPt.x + dx*t, ny = lastDabPt.y + dy*t;
-    paintDab(nx, ny, radius, rgb, opacity, mixW);
-    if (tool === "crayon") paintTexture(nx,ny,radius,rgb,mixW);
-    lastDabPt = {x:nx, y:ny};
-    dx = p1.x-lastDabPt.x; dy = p1.y-lastDabPt.y;
-    dist = Math.hypot(dx,dy);
-  }
+
+  ctx.beginPath();
+  ctx.moveTo(p0.x, p0.y);
+  ctx.lineTo(p1.x, p1.y);
+  ctx.stroke();
+  ctx.restore();
 }
 
 function eraseSegment(p0,p1){
@@ -826,6 +769,15 @@ renderHome();
 let pendingDeleteId = null;
 let currentMathAnswer = 0;
 
+let pendingDeleteId = null;
+let currentMathAnswer = 0;
+
+function closeDeleteModal(){
+  document.getElementById("deleteModal").classList.remove("show");
+  document.getElementById("deleteErrorMsg").style.display = "none";
+  pendingDeleteId = null;
+}
+
 function openDeleteModal(pageId){
   pendingDeleteId = pageId;
   const num1 = Math.floor(Math.random() * 8) + 3;
@@ -833,8 +785,36 @@ function openDeleteModal(pageId){
   currentMathAnswer = num1 + num2;
   document.getElementById("deleteGateText").textContent = `Adult Gate: What is ${num1} + ${num2}?`;
   document.getElementById("deleteMathAnswer").value = "";
+  document.getElementById("deleteErrorMsg").style.display = "none";
   document.getElementById("deleteModal").classList.add("show");
 }
+
+/* Close modal when clicking on the dark backdrop outside the card */
+document.getElementById("deleteModal").addEventListener("click", (e)=>{
+  if (e.target.id === "deleteModal") {
+    closeDeleteModal();
+  }
+});
+
+document.getElementById("cancelDelete").addEventListener("click", closeDeleteModal);
+
+document.getElementById("confirmDelete").addEventListener("click", ()=>{
+  const input = parseInt(document.getElementById("deleteMathAnswer").value, 10);
+  if (input === currentMathAnswer){
+    if (pendingDeleteId){
+      const updated = store.get(CUSTOM_KEY, []).filter(x=>x.id!==pendingDeleteId);
+      store.set(CUSTOM_KEY, updated);
+      localStorage.removeItem(strokesKey(pendingDeleteId));
+      renderHome();
+    }
+    closeDeleteModal();
+  } else {
+    /* Show inline error text without popping up an alert modal */
+    document.getElementById("deleteErrorMsg").style.display = "block";
+    document.getElementById("deleteMathAnswer").value = "";
+    document.getElementById("deleteMathAnswer").focus();
+  }
+});
 
 document.getElementById("cancelDelete").addEventListener("click", ()=>{
   document.getElementById("deleteModal").classList.remove("show");
