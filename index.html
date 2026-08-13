@@ -722,6 +722,8 @@ document.getElementById("importBtn").addEventListener("click", ()=>{
   document.getElementById("pdfInput").click();
 });
 async function fileToOutlineData(file){
+  let dataUrl = "";
+
   if (file.type === "application/pdf"){
     if (!window.pdfjsLib){
       throw new Error("PDF reader not available");
@@ -733,7 +735,7 @@ async function fileToOutlineData(file){
     const tmp = document.createElement("canvas");
     tmp.width = viewport.width; tmp.height = viewport.height;
     await page.render({canvasContext: tmp.getContext("2d"), viewport}).promise;
-    return tmp.toDataURL("image/png");
+    dataUrl = tmp.toDataURL("image/png");
   } else if (file.type.startsWith("image/")){
     const rawDataUrl = await new Promise((res, rej)=>{
       const reader = new FileReader();
@@ -756,10 +758,23 @@ async function fileToOutlineData(file){
     const tmp = document.createElement("canvas");
     tmp.width = w; tmp.height = h;
     tmp.getContext("2d").drawImage(img, 0, 0, w, h);
-    return tmp.toDataURL("image/png");
+    dataUrl = tmp.toDataURL("image/png");
   } else {
     throw new Error("Unsupported file type: " + file.type);
   }
+
+  // Force browser GPU/CPU to decode the generated base64 string into memory
+  try {
+    const checkImg = new Image();
+    checkImg.src = dataUrl;
+    if (checkImg.decode) {
+      await checkImg.decode();
+    }
+  } catch (e) {
+    // Fallback if decode is interrupted or unsupported
+  }
+
+  return dataUrl;
 }
 
 document.getElementById("pdfInput").addEventListener("change", async (e)=>{
@@ -779,6 +794,14 @@ document.getElementById("pdfInput").addEventListener("change", async (e)=>{
   for (const file of files){
     try{
       const outlineData = await fileToOutlineData(file);
+      
+      // Warm up the image decoder explicitly for the new card data URL
+      const preWarm = new Image();
+      preWarm.src = outlineData;
+      if (preWarm.decode) {
+        await preWarm.decode().catch(() => {});
+      }
+
       const id = "page_" + Date.now() + "_" + Math.random().toString(36).slice(2,7);
       const name = file.name.replace(/\.[^.]+$/,"").slice(0,20) || "Imported";
       imported.push({id, name, outline: outlineData, createdAt: Date.now()});
