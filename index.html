@@ -179,6 +179,73 @@
   </div>
 
   <!-- ============ DRAW ============ -->
+  <div id="draw">
+    <div class="topbar">
+      <button class="sticker exit-btn" id="exitBtn">← Exit</button>
+      <div class="zoom-controls">
+        <button class="sticker zoom-btn" id="zoomOutBtn">−</button>
+        <button class="sticker zoom-btn" id="zoomInBtn">+</button>
+      </div>
+      <button class="sticker clear-btn" id="clearBtn">🧽 Wipe clean</button>
+    </div>
+
+    <div class="main-row">
+      <div class="draw-container">
+        <div class="canvas-wrap">
+          <div id="canvasFrame">
+            <canvas id="drawCanvas"></canvas>
+            <img id="outlineImg" alt="">
+          </div>
+        </div>
+        <div class="color-row" id="colorRow"></div>
+      </div>
+
+      <div class="side-dock right" id="toolsDock">
+        <button class="sticker tool-btn selected" data-tool="brush" title="Thick paintbrush">
+          <svg viewBox="0 0 48 48">
+            <rect x="0" y="0" width="9" height="20" rx="4" fill="#B5651D" transform="rotate(45 4.5 10)"/>
+            <rect x="8" y="12" width="11" height="9" rx="3" fill="#D9D9E3" transform="rotate(45 13.5 16.5)"/>
+            <path d="M16 22 C 10 26 6 32 9 40 C 13 44 20 42 23 35 L 30 20 L 22 16 Z" fill="#fff"/>
+            <circle cx="12" cy="37" r="5" fill="#FF6B6B"/>
+          </svg>
+        </button>
+        <button class="sticker tool-btn" data-tool="marker" title="Medium marker">
+          <svg viewBox="0 0 48 48">
+            <rect x="14" y="4" width="18" height="15" rx="5" fill="#F3722C"/>
+            <rect x="14" y="4" width="18" height="6" rx="3" fill="#fff" opacity="0.45"/>
+            <path d="M14 19 L14 27 L23 42 L32 27 L32 19 Z" fill="#2B2B33"/>
+          </svg>
+        </button>
+        <button class="sticker tool-btn" data-tool="crayon" title="Thin crayon">
+          <svg viewBox="0 0 48 48">
+            <path d="M10 40 L28 9 Q32 3 37 8 Q42 13 36 17 L15 41 Z" fill="#E63946"/>
+            <path d="M10 40 L15 41 L18 35 L13 33 Z" fill="#fff"/>
+            <line x1="18" y1="30" x2="28" y2="14" stroke="#fff" stroke-width="3.4" stroke-linecap="round"/>
+          </svg>
+        </button>
+        <button class="sticker tool-btn" data-tool="stamp" title="Stamps">
+          <svg viewBox="0 0 48 48">
+            <path d="M24 4 L29 17 L43 18 L32 27 L36 42 L24 33 L12 42 L16 27 L5 18 L19 17 Z" fill="#FFC93C"/>
+            <circle cx="18" cy="14" r="2.6" fill="#fff" opacity="0.85"/>
+          </svg>
+        </button>
+        <button class="sticker tool-btn" data-tool="eraser" title="Eraser">
+          <svg viewBox="0 0 48 48">
+            <path d="M8 30 L26 12 C 29 9 33 9 36 12 L40 16 C 43 19 43 23 40 26 L28 38 L12 38 C 9 38 7 36 7 34 Z" fill="#FF8FB1"/>
+            <path d="M12 38 L28 38 L21 31 L15 31 Z" fill="#E0638A"/>
+            <line x1="17" y1="21" x2="31" y2="35" stroke="#fff" stroke-width="2.6" opacity="0.65" stroke-linecap="round"/>
+          </svg>
+        </button>
+      </div>
+
+      <div class="side-dock right" id="shapesDock" style="display:none;">
+        <button class="sticker tool-btn shape-btn" data-shape="star">★</button>
+        <button class="sticker tool-btn shape-btn" data-shape="heart">♥</button>
+        <button class="sticker tool-btn shape-btn" data-shape="circle">●</button>
+        <button class="sticker tool-btn shape-btn" data-shape="triangle">▲</button>
+      </div>
+    </div>
+  </div>
 
   <div class="modal-backdrop" id="clearModal">
     <div class="modal-card">
@@ -517,18 +584,27 @@ function renderColors(){
 
 let currentZoom = 1;
 
-document.getElementById("zoomInBtn").addEventListener("click", ()=>{
-  currentZoom = Math.min(2.0, currentZoom + 0.15);
-  applyZoom();
-});
-document.getElementById("zoomOutBtn").addEventListener("click", ()=>{
-  currentZoom = Math.max(0.6, currentZoom - 0.15);
-  applyZoom();
-});
+const zoomIn = document.getElementById("zoomInBtn");
+const zoomOut = document.getElementById("zoomOutBtn");
+
+if (zoomIn) {
+  zoomIn.addEventListener("click", ()=>{
+    currentZoom = Math.min(2.0, currentZoom + 0.15);
+    applyZoom();
+  });
+}
+if (zoomOut) {
+  zoomOut.addEventListener("click", ()=>{
+    currentZoom = Math.max(0.6, currentZoom - 0.15);
+    applyZoom();
+  });
+}
 
 function applyZoom(){
-  canvasFrame.style.transform = `scale(${currentZoom})`;
-  canvasFrame.style.transformOrigin = "center center";
+  if (canvasFrame) {
+    canvasFrame.style.transform = `scale(${currentZoom})`;
+    canvasFrame.style.transformOrigin = "center center";
+  }
 }
 
 document.querySelectorAll("#toolsDock .tool-btn").forEach(b=>{
