@@ -330,13 +330,10 @@ function allPages(){
 let lcPages = [];
 
 function buildCard(p, isClone){
-  const card = document.createElement("div");
-  card.className = "page-card" + (hasProgress(p.id) ? " has-progress" : "");
-  card.dataset.id = p.id;
-
   const savedStrokes = hasProgress(p.id)
     ? store.get(strokesKey(p.id))
     : null;
+
 
   card.innerHTML = `
     ${(p.custom && !isClone) ? '<button class="del">✕</button>' : ''}
@@ -345,7 +342,9 @@ function buildCard(p, isClone){
     <div class="name">${p.name}</div>
   `;
 
+
   const art = card.querySelector(".art");
+
 
   // Add saved coloring first, if there is any.
   if (savedStrokes) {
@@ -357,22 +356,24 @@ function buildCard(p, isClone){
     art.appendChild(strokesImg);
   }
 
+
   if (p.custom) {
-    // Show a stable placeholder until Safari has actually
-    // loaded the imported image.
     const outlineImg = new Image();
     outlineImg.className = "outline-img";
     outlineImg.alt = "";
     outlineImg.decoding = "async";
 
+
     outlineImg.onload = () => {
       outlineImg.classList.add("loaded");
     };
+
 
     outlineImg.onerror = () => {
       console.warn("Could not display imported page:", p.name);
       outlineImg.remove();
     };
+
 
     outlineImg.src = p.outline;
     art.appendChild(outlineImg);
@@ -383,10 +384,12 @@ function buildCard(p, isClone){
     art.appendChild(outline);
   }
 
+
   card.addEventListener("click", (e)=>{
     if (e.target.closest(".del")) return;
     openPage(p);
   });
+
 
   if (p.custom && !isClone){
     card.querySelector(".del").addEventListener("click", (e)=>{
@@ -394,6 +397,7 @@ function buildCard(p, isClone){
       openDeleteModal(p.id);
     });
   }
+
 
   return card;
 }
@@ -574,8 +578,6 @@ function sizeCanvasFrame(){
   canvasFrame.style.width = w + "px";
   canvasFrame.style.height = h + "px";
 
-  // Don't resize the actual canvas if its pixel dimensions
-  // are already correct. Resizing a canvas destroys its contents.
   if (
     drawCanvas.width === newWidth &&
     drawCanvas.height === newHeight
@@ -583,10 +585,22 @@ function sizeCanvasFrame(){
     return;
   }
 
+  // Dimensions are actually changing (first open, or a real rotation/resize) —
+  // preserve whatever's already drawn by snapshotting before resizing, since
+  // resizing a canvas always clears its contents.
+  const prevW = drawCanvas.width, prevH = drawCanvas.height;
+  const snapshot = (prevW && prevH) ? ctx.getImageData(0,0,prevW,prevH) : null;
+
   drawCanvas.width = newWidth;
   drawCanvas.height = newHeight;
-
   ctx.setTransform(1, 0, 0, 1, 0, 0);
+
+  if (snapshot){
+    const tmp = document.createElement("canvas");
+    tmp.width = prevW; tmp.height = prevH;
+    tmp.getContext("2d").putImageData(snapshot, 0, 0);
+    ctx.drawImage(tmp, 0, 0, drawCanvas.width, drawCanvas.height);
+  }
 }
 window.addEventListener("resize", ()=>{ if(currentPageId) sizeCanvasFrame(); });
 
@@ -604,16 +618,17 @@ function openPage(page){
   ? page.outline
   : ("data:image/svg+xml;utf8," + encodeURIComponent(OUTLINES[page.id]));
 
-requestAnimationFrame(() => {
-  sizeCanvasFrame();
+  requestAnimationFrame(() => {
+    sizeCanvasFrame();
 
-});
-  ctx.clearRect(0,0,drawCanvas.width,drawCanvas.height);
-  if (saved){
-    const img = new Image();
-    img.onload = ()=>{ ctx.drawImage(img, 0,0, drawCanvas.width, drawCanvas.height); };
-    img.src = saved;
-  }
+    const saved = store.get(strokesKey(page.id), null);
+    ctx.clearRect(0,0,drawCanvas.width,drawCanvas.height);
+    if (saved){
+      const img = new Image();
+      img.onload = ()=>{ ctx.drawImage(img, 0,0, drawCanvas.width, drawCanvas.height); };
+      img.src = saved;
+    }
+  });
 }
 
 function saveProgress(){
@@ -628,7 +643,7 @@ function updateUndoBtnState(){
 
 function pushUndoSnapshot(){
   try{
-    undoStack.push(drawCanvas.toDataURL("image/jpeg", 0.85));
+    undoStack.push(drawCanvas.toDataURL("image/png"));
     if (undoStack.length > UNDO_MAX) undoStack.shift();
     updateUndoBtnState();
   }catch(e){ console.warn("Could not capture undo snapshot", e); }
@@ -687,10 +702,6 @@ function getPoint(evt){
 
 const TOOL_WIDTH = { brush:92, marker:52, crayon:24 };
 
-/* Simple, direct strokes: new color fully covers whatever was underneath.
-   No pixel-level blending, no getImageData/putImageData — just a standard
-   canvas stroke per segment. This is the most reliable, best-performing
-   approach and avoids any mixing-related rendering glitches. */
 function paintAlongSegment(p0, p1, tool){
   ctx.globalCompositeOperation = "source-over";
   ctx.globalAlpha = 1;
@@ -842,17 +853,6 @@ async function fileToOutlineData(file){
     throw new Error("Unsupported file type: " + file.type);
   }
 
-  // Force browser GPU/CPU to decode the generated base64 string into memory
-  try {
-    const checkImg = new Image();
-    checkImg.src = dataUrl;
-    if (checkImg.decode) {
-      await checkImg.decode();
-    }
-  } catch (e) {
-    // Fallback if decode is interrupted or unsupported
-  }
-
   return dataUrl;
 }
 
@@ -873,14 +873,6 @@ document.getElementById("pdfInput").addEventListener("change", async (e)=>{
   for (const file of files){
     try{
       const outlineData = await fileToOutlineData(file);
-      
-      // Warm up the image decoder explicitly for the new card data URL
-      const preWarm = new Image();
-      preWarm.src = outlineData;
-      if (preWarm.decode) {
-        await preWarm.decode().catch(() => {});
-      }
-
       const id = "page_" + Date.now() + "_" + Math.random().toString(36).slice(2,7);
       const name = file.name.replace(/\.[^.]+$/,"").slice(0,20) || "Imported";
       imported.push({id, name, outline: outlineData, createdAt: Date.now()});
@@ -938,7 +930,6 @@ function openDeleteModal(pageId){
   document.getElementById("deleteModal").classList.add("show");
 }
 
-/* Close modal when clicking backdrop outside card */
 document.getElementById("deleteModal").addEventListener("click", (e)=>{
   if (e.target.id === "deleteModal") {
     closeDeleteModal();
@@ -968,7 +959,6 @@ document.getElementById("confirmDelete").addEventListener("click", ()=>{
 renderColors();
 renderHome();
   
-// Comment these out while active testing:
 //if ("serviceWorker" in navigator){
   //window.addEventListener("load", ()=>{
     //navigator.serviceWorker.register("service-worker.js").catch(()=>{});
