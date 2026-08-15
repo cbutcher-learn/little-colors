@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Little Colors</title>
+  <link rel="manifest" href="manifest.json">
   <style>
     body { margin: 0; overflow: hidden; background: #eee; touch-action: none; }
     #toolbar { position: absolute; top: 10px; left: 10px; z-index: 10; display: flex; gap: 10px; }
@@ -21,5 +22,14 @@
   </div>
   <canvas id="canvasFrame"></canvas>
   <script src="app.js"></script>
+  <script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('./sw.js')
+        .then(reg => console.log('Service Worker registered', reg))
+        .catch(err => console.error('Service Worker registration failed', err));
+    });
+  }
+  </script>
 </body>
 </html>
