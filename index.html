@@ -68,25 +68,7 @@
   }
   .page-card .art{ width:82%; height:78%; position:relative; }
   .page-card .art .strokes-img{ position:absolute; inset:0; width:100%; height:100%; object-fit:contain; }
-  .page-card .art .outline-img,
-.page-card .art .outline-svg{
-  position:absolute;
-  inset:0;
-  width:100%;
-  height:100%;
-  object-fit:contain;
-  mix-blend-mode:multiply;
-  pointer-events:none;
-}
-
-.page-card .art .outline-img{
-  opacity:0;
-  transition:opacity .08s ease;
-}
-
-.page-card .art .outline-img.loaded{
-  opacity:1;
-}
+  .page-card .art .outline-img, .page-card .art .outline-svg{ position:absolute; inset:0; width:100%; height:100%; mix-blend-mode:multiply; pointer-events:none; }
   .page-card .art .outline-svg svg{ width:100%; height:100%; display:block; }
   .page-card .name{ font-size:17px; font-weight:800; margin-top:4px; }
   .page-card .dot{ position:absolute; top:12px; right:12px; width:14px; height:14px; border-radius:50%; background:var(--leaf); box-shadow:0 0 0 3px #fff; display:none; z-index:2; }
@@ -310,6 +292,7 @@ let currentColor = COLORS[0].v;
 let drawing = false;
 let lastPt = null;
 let lastStampPt = null;
+let lastDabPt = null;
 let undoStack = [];
 const UNDO_MAX = 15;
 
@@ -330,75 +313,32 @@ function allPages(){
 let lcPages = [];
 
 function buildCard(p, isClone){
-  const savedStrokes = hasProgress(p.id)
-    ? store.get(strokesKey(p.id))
-    : null;
-
-
+  const card = document.createElement("div");
+  card.className = "page-card" + (hasProgress(p.id) ? " has-progress" : "");
+  card.dataset.id = p.id;
+  const savedStrokes = hasProgress(p.id) ? store.get(strokesKey(p.id)) : null;
+  const outlineHtml = p.custom
+    ? `<img class="outline-img" src="${p.outline}" alt="">`
+    : `<div class="outline-svg">${OUTLINES[p.id]}</div>`;
   card.innerHTML = `
     ${(p.custom && !isClone) ? '<button class="del">✕</button>' : ''}
     <div class="dot"></div>
-    <div class="art"></div>
+    <div class="art">
+      ${savedStrokes ? `<img class="strokes-img" src="${savedStrokes}" alt="">` : ''}
+      ${outlineHtml}
+    </div>
     <div class="name">${p.name}</div>
   `;
-
-
-  const art = card.querySelector(".art");
-
-
-  // Add saved coloring first, if there is any.
-  if (savedStrokes) {
-    const strokesImg = new Image();
-    strokesImg.className = "strokes-img";
-    strokesImg.alt = "";
-    strokesImg.decoding = "async";
-    strokesImg.src = savedStrokes;
-    art.appendChild(strokesImg);
-  }
-
-
-  if (p.custom) {
-    const outlineImg = new Image();
-    outlineImg.className = "outline-img";
-    outlineImg.alt = "";
-    outlineImg.decoding = "async";
-
-
-    outlineImg.onload = () => {
-      outlineImg.classList.add("loaded");
-    };
-
-
-    outlineImg.onerror = () => {
-      console.warn("Could not display imported page:", p.name);
-      outlineImg.remove();
-    };
-
-
-    outlineImg.src = p.outline;
-    art.appendChild(outlineImg);
-  } else {
-    const outline = document.createElement("div");
-    outline.className = "outline-svg";
-    outline.innerHTML = OUTLINES[p.id] || "";
-    art.appendChild(outline);
-  }
-
-
   card.addEventListener("click", (e)=>{
     if (e.target.closest(".del")) return;
     openPage(p);
   });
-
-
   if (p.custom && !isClone){
     card.querySelector(".del").addEventListener("click", (e)=>{
       e.stopPropagation();
       openDeleteModal(p.id);
     });
   }
-
-
   return card;
 }
 
@@ -555,51 +495,25 @@ document.querySelectorAll("#shapesDock .shape-btn").forEach(b=>{
 /* ---------- Canvas sizing ---------- */
 function sizeCanvasFrame(){
   const wrap = document.querySelector(".canvas-wrap");
-  if (!wrap) return;
-
   const wW = wrap.clientWidth;
   const wH = wrap.clientHeight;
+  const targetRatio = 4/3;
+  let w = wW, h = w/targetRatio;
+  if (h > wH){ h = wH; w = h*targetRatio; }
+  canvasFrame.style.width = w+"px";
+  canvasFrame.style.height = h+"px";
 
-  const targetRatio = 4 / 3;
-
-  let w = wW;
-  let h = w / targetRatio;
-
-  if (h > wH){
-    h = wH;
-    w = h * targetRatio;
-  }
-
-  const dpr = Math.min(window.devicePixelRatio || 1, 2);
-
-  const newWidth = Math.round(w * dpr);
-  const newHeight = Math.round(h * dpr);
-
-  canvasFrame.style.width = w + "px";
-  canvasFrame.style.height = h + "px";
-
-  if (
-    drawCanvas.width === newWidth &&
-    drawCanvas.height === newHeight
-  ){
-    return;
-  }
-
-  // Dimensions are actually changing (first open, or a real rotation/resize) —
-  // preserve whatever's already drawn by snapshotting before resizing, since
-  // resizing a canvas always clears its contents.
   const prevW = drawCanvas.width, prevH = drawCanvas.height;
   const snapshot = (prevW && prevH) ? ctx.getImageData(0,0,prevW,prevH) : null;
-
-  drawCanvas.width = newWidth;
-  drawCanvas.height = newHeight;
-  ctx.setTransform(1, 0, 0, 1, 0, 0);
-
+  const dpr = window.devicePixelRatio || 1;
+  drawCanvas.width = Math.round(w*dpr);
+  drawCanvas.height = Math.round(h*dpr);
+  ctx.setTransform(1,0,0,1,0,0);
   if (snapshot){
     const tmp = document.createElement("canvas");
     tmp.width = prevW; tmp.height = prevH;
-    tmp.getContext("2d").putImageData(snapshot, 0, 0);
-    ctx.drawImage(tmp, 0, 0, drawCanvas.width, drawCanvas.height);
+    tmp.getContext("2d").putImageData(snapshot,0,0);
+    ctx.drawImage(tmp, 0,0, drawCanvas.width, drawCanvas.height);
   }
 }
 window.addEventListener("resize", ()=>{ if(currentPageId) sizeCanvasFrame(); });
@@ -614,21 +528,17 @@ function openPage(page){
   document.getElementById("home").style.display = "none";
   document.getElementById("draw").classList.add("active");
 
-  outlineImg.src = page.custom
-  ? page.outline
-  : ("data:image/svg+xml;utf8," + encodeURIComponent(OUTLINES[page.id]));
+  outlineImg.src = page.custom ? page.outline : ("data:image/svg+xml;utf8," + encodeURIComponent(OUTLINES[page.id]));
 
-  requestAnimationFrame(() => {
-    sizeCanvasFrame();
+  sizeCanvasFrame();
 
-    const saved = store.get(strokesKey(page.id), null);
-    ctx.clearRect(0,0,drawCanvas.width,drawCanvas.height);
-    if (saved){
-      const img = new Image();
-      img.onload = ()=>{ ctx.drawImage(img, 0,0, drawCanvas.width, drawCanvas.height); };
-      img.src = saved;
-    }
-  });
+  const saved = store.get(strokesKey(page.id), null);
+  ctx.clearRect(0,0,drawCanvas.width,drawCanvas.height);
+  if (saved){
+    const img = new Image();
+    img.onload = ()=>{ ctx.drawImage(img, 0,0, drawCanvas.width, drawCanvas.height); };
+    img.src = saved;
+  }
 }
 
 function saveProgress(){
@@ -701,18 +611,85 @@ function getPoint(evt){
 }
 
 const TOOL_WIDTH = { brush:92, marker:52, crayon:24 };
+const TOOL_OPACITY = { brush:0.92, marker:1.0, crayon:0.88 };
+const TOOL_MIXWEIGHT = { brush:0.5, marker:0.55, crayon:0.55 };
+
+function hexToRgb(hex){
+  const v = parseInt(hex.slice(1),16);
+  return [(v>>16)&255, (v>>8)&255, v&255];
+}
+
+/* Paints one round "dab": where the canvas already has paint, blend the new
+   color into what's there (so red over blue makes purple, like real paint);
+   where it's blank, lay the new color down at the tool's normal opacity.
+   Stamping dabs along the path (instead of one continuous ctx.stroke per
+   mousemove segment) avoids the dark overlap blotches you get from drawing
+   lots of small translucent strokes that cross back over each other. */
+function paintDab(cx, cy, radius, rgb, opacity, mixWeight){
+  const x0 = Math.max(0, Math.floor(cx-radius));
+  const y0 = Math.max(0, Math.floor(cy-radius));
+  const x1 = Math.min(drawCanvas.width, Math.ceil(cx+radius));
+  const y1 = Math.min(drawCanvas.height, Math.ceil(cy+radius));
+  const w = x1-x0, h = y1-y0;
+  if (w<=0||h<=0) return;
+  const imgData = ctx.getImageData(x0,y0,w,h);
+  const data = imgData.data;
+  const r2 = radius*radius;
+  const nr=rgb[0], ng=rgb[1], nb=rgb[2];
+  const newAlpha = Math.round(255*opacity);
+  for(let yy=0; yy<h; yy++){
+    const dy = (y0+yy+0.5) - cy;
+    const dy2 = dy*dy;
+    const rowBase = yy*w;
+    for(let xx=0; xx<w; xx++){
+      const dx = (x0+xx+0.5) - cx;
+      if (dx*dx+dy2 > r2) continue;
+      const idx = (rowBase+xx)*4;
+      const a = data[idx+3];
+      if (a > 10){
+        data[idx]   = (data[idx]  *(1-mixWeight) + nr*mixWeight) | 0;
+        data[idx+1] = (data[idx+1]*(1-mixWeight) + ng*mixWeight) | 0;
+        data[idx+2] = (data[idx+2]*(1-mixWeight) + nb*mixWeight) | 0;
+        data[idx+3] = 255;
+      } else {
+        data[idx]=nr; data[idx+1]=ng; data[idx+2]=nb; data[idx+3]=newAlpha;
+      }
+    }
+  }
+  ctx.putImageData(imgData, x0, y0);
+}
+
+function paintTexture(cx,cy,radius,rgb,mixW){
+  for(let i=0;i<2;i++){
+    const jx=(Math.random()-0.5)*radius*0.6, jy=(Math.random()-0.5)*radius*0.6;
+    paintDab(cx+jx, cy+jy, radius*0.5, rgb, 0.4, mixW*0.6);
+  }
+}
 
 function paintAlongSegment(p0, p1, tool){
-  ctx.globalCompositeOperation = "source-over";
-  ctx.globalAlpha = 1;
-  ctx.strokeStyle = currentColor;
-  ctx.lineWidth = TOOL_WIDTH[tool];
-  ctx.lineCap = "round";
-  ctx.lineJoin = "round";
-  ctx.beginPath();
-  ctx.moveTo(p0.x, p0.y);
-  ctx.lineTo(p1.x, p1.y);
-  ctx.stroke();
+  const radius = TOOL_WIDTH[tool]/2;
+  const rgb = hexToRgb(currentColor);
+  const opacity = TOOL_OPACITY[tool];
+  const mixW = TOOL_MIXWEIGHT[tool];
+  const spacing = Math.max(radius*0.35, 3);
+
+  if (!lastDabPt){
+    paintDab(p1.x, p1.y, radius, rgb, opacity, mixW);
+    if (tool === "crayon") paintTexture(p1.x,p1.y,radius,rgb,mixW);
+    lastDabPt = {x:p1.x, y:p1.y};
+    return;
+  }
+  let dx = p1.x-lastDabPt.x, dy = p1.y-lastDabPt.y;
+  let dist = Math.hypot(dx,dy);
+  while (dist >= spacing){
+    const t = spacing/dist;
+    const nx = lastDabPt.x + dx*t, ny = lastDabPt.y + dy*t;
+    paintDab(nx, ny, radius, rgb, opacity, mixW);
+    if (tool === "crayon") paintTexture(nx,ny,radius,rgb,mixW);
+    lastDabPt = {x:nx, y:ny};
+    dx = p1.x-lastDabPt.x; dy = p1.y-lastDabPt.y;
+    dist = Math.hypot(dx,dy);
+  }
 }
 
 function eraseSegment(p0,p1){
@@ -758,6 +735,7 @@ function handleStart(evt){
   pushUndoSnapshot();
   const p = getPoint(evt);
   lastPt = p;
+  lastDabPt = null;
   if (currentTool === "stamp"){
     const scale = drawCanvas.width/800;
     drawShape(p.x, p.y, currentShape, 90*Math.max(scale,0.5), currentColor);
@@ -790,7 +768,7 @@ function handleMove(evt){
 }
 function handleEnd(){
   if (!drawing) return;
-  drawing = false; lastPt = null; lastStampPt = null;
+  drawing = false; lastPt = null; lastStampPt = null; lastDabPt = null;
   saveProgress();
 }
 
@@ -798,6 +776,9 @@ canvasFrame.addEventListener("pointerdown", handleStart);
 canvasFrame.addEventListener("pointermove", handleMove);
 window.addEventListener("pointerup", handleEnd);
 window.addEventListener("pointercancel", handleEnd);
+canvasFrame.addEventListener("touchstart", handleStart, {passive:false});
+canvasFrame.addEventListener("touchmove", handleMove, {passive:false});
+canvasFrame.addEventListener("touchend", handleEnd, {passive:false});
 
 document.addEventListener("visibilitychange", ()=>{ if(document.hidden) saveProgress(); });
 
@@ -806,8 +787,6 @@ document.getElementById("importBtn").addEventListener("click", ()=>{
   document.getElementById("pdfInput").click();
 });
 async function fileToOutlineData(file){
-  let dataUrl = "";
-
   if (file.type === "application/pdf"){
     if (!window.pdfjsLib){
       throw new Error("PDF reader not available");
@@ -819,7 +798,7 @@ async function fileToOutlineData(file){
     const tmp = document.createElement("canvas");
     tmp.width = viewport.width; tmp.height = viewport.height;
     await page.render({canvasContext: tmp.getContext("2d"), viewport}).promise;
-    dataUrl = tmp.toDataURL("image/png");
+    return tmp.toDataURL("image/png");
   } else if (file.type.startsWith("image/")){
     const rawDataUrl = await new Promise((res, rej)=>{
       const reader = new FileReader();
@@ -833,27 +812,19 @@ async function fileToOutlineData(file){
       im.onerror = rej;
       im.src = rawDataUrl;
     });
-    const maxDim = 1000;
+    const maxDim = 1400;
     let w = img.width, h = img.height;
     if (w > maxDim || h > maxDim){
       const scale = maxDim / Math.max(w,h);
       w = Math.round(w*scale); h = Math.round(h*scale);
     }
     const tmp = document.createElement("canvas");
-    tmp.width = w;
-    tmp.height = h;
-    
-    const tmpCtx = tmp.getContext("2d", { alpha: false });
-    tmpCtx.fillStyle = "#FFFFFF";
-    tmpCtx.fillRect(0, 0, w, h);
-    tmpCtx.drawImage(img, 0, 0, w, h);
-    
-    dataUrl = tmp.toDataURL("image/jpeg", 0.85);
+    tmp.width = w; tmp.height = h;
+    tmp.getContext("2d").drawImage(img, 0, 0, w, h);
+    return tmp.toDataURL("image/png");
   } else {
     throw new Error("Unsupported file type: " + file.type);
   }
-
-  return dataUrl;
 }
 
 document.getElementById("pdfInput").addEventListener("change", async (e)=>{
@@ -930,6 +901,7 @@ function openDeleteModal(pageId){
   document.getElementById("deleteModal").classList.add("show");
 }
 
+/* Close modal when clicking backdrop outside card */
 document.getElementById("deleteModal").addEventListener("click", (e)=>{
   if (e.target.id === "deleteModal") {
     closeDeleteModal();
@@ -959,6 +931,7 @@ document.getElementById("confirmDelete").addEventListener("click", ()=>{
 renderColors();
 renderHome();
   
+// Comment these out while active testing:
 //if ("serviceWorker" in navigator){
   //window.addEventListener("load", ()=>{
     //navigator.serviceWorker.register("service-worker.js").catch(()=>{});
