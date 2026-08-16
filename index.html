@@ -96,44 +96,51 @@
 
   .topbar{
     display:flex; align-items:center; justify-content:space-between;
-    padding: max(12px, env(safe-area-inset-top)) 16px 8px 16px; gap:10px; flex:0 0 auto;
+    padding: max(8px, env(safe-area-inset-top)) 12px 6px 12px; gap:10px; flex:0 0 auto;
+    position:relative; z-index:10; background:var(--sky);
   }
   .exit-btn{ background:var(--coral); font-size:16px; padding:12px 20px; height:52px; }
-  .page-name{ font-size:19px; font-weight:900; }
+  .zoom-controls{ display:flex; gap:10px; align-items:center; }
+  .zoom-btn{ background:var(--sky-deep); font-size:24px; width:52px; height:52px; }
+  .right-controls{ display:flex; gap:10px; align-items:center; }
+  .undo-btn{ background:#8791A8; font-size:14px; padding:12px 18px; height:52px; }
+  .undo-btn.disabled{ opacity:0.4; pointer-events:none; }
   .clear-btn{ background:#6C757D; font-size:14px; padding:12px 18px; height:52px; }
 
-  .main-row{ flex:1; display:flex; flex-direction:row; min-height:0; gap:6px; padding:0 8px; }
+  .main-row{ flex:1; display:flex; flex-direction:row; min-height:0; gap:0; padding:0; }
+
+  .draw-container{ flex:1; display:flex; flex-direction:column; min-width:0; min-height:0; }
 
   .side-dock{
-    flex:0 0 auto; width:74px; display:flex; flex-direction:column;
-    align-items:center; justify-content:center; gap:10px;
+    flex:0 0 auto; width:140px; display:flex; flex-direction:column;
+    align-items:center; justify-content:center; gap:12px; padding:8px 0;
+    position:relative; z-index:10; background:var(--sky);
   }
-  .side-dock.left{ visibility:hidden; }
-  .side-dock.left.show{ visibility:visible; }
 
-  .canvas-wrap{ flex:1; min-width:0; display:flex; align-items:center; justify-content:center; padding:4px 2px; min-height:0; }
+  .canvas-wrap{ flex:1; min-width:0; display:flex; align-items:center; justify-content:center; padding:0; min-height:0; width:100%; }
   #canvasFrame{
     position:relative; background:var(--paper);
     border-radius:20px; box-shadow:0 8px 0 rgba(0,0,0,0.12);
     touch-action:none; overflow:hidden;
   }
-  #canvasFrame canvas, #canvasFrame img{ position:absolute; inset:0; width:100%; height:100%; }
+  #canvasFrame canvas, #canvasFrame img{ position:absolute; inset:0; width:100%; height:100%; object-fit:contain; }
   #outlineImg{ pointer-events:none; mix-blend-mode:multiply; }
 
   .color-row{
-    flex:0 0 auto; display:flex; gap:10px; align-items:center; justify-content:center; flex-wrap:wrap;
-    padding: 10px 14px max(10px, env(safe-area-inset-bottom)) 14px;
-    background:var(--paper); border-top-left-radius:24px; border-top-right-radius:24px;
+    flex:0 0 auto; display:flex; gap:10px; align-items:center; justify-content:center; flex-wrap:nowrap;
+    padding: 8px 12px max(8px, env(safe-area-inset-bottom)) 12px;
+    background:var(--paper); border-top-left-radius:24px; border-top-right-radius:24px; overflow-x:auto;
+    position:relative; z-index:10;
   }
 
-  .tool-btn{ width:64px; height:64px; background:#8791A8; padding:10px; flex:0 0 auto; }
-  .tool-btn svg{ width:38px; height:38px; }
+  .tool-btn{ width:128px; height:128px; background:#8791A8; padding:16px; flex:0 0 auto; border-radius:32px; }
+  .tool-btn svg{ width:76px; height:76px; }
   .tool-btn.selected{ background:var(--sky-deep); outline-color:var(--sun); transform:scale(1.05); }
 
-  .shape-btn{ width:52px; height:52px; font-size:22px; background:#B7C0D8; flex:0 0 auto; }
+  .shape-btn{ width:128px; height:128px; font-size:48px; background:#8791A8; flex:0 0 auto; border-radius:32px; }
   .shape-btn.selected{ background:var(--sun); }
 
-  .color-swatch{ width:48px; height:48px; border-radius:50%; box-shadow:0 4px 0 rgba(0,0,0,.18); outline:4px solid #fff; outline-offset:-4px; }
+  .color-swatch{ width:96px; height:96px; border-radius:50%; box-shadow:0 6px 0 rgba(0,0,0,.18); outline:6px solid #fff; outline-offset:-6px; }
   .color-swatch.selected{ outline-color:var(--ink); transform:scale(1.12); }
 
   .modal-backdrop{
@@ -174,74 +181,73 @@
     </div>
     <div class="dots" id="dots"></div>
 
-    <input type="file" id="pdfInput" accept="application/pdf,image/png,image/jpeg,image/jpg,image/webp" style="display:none;">
+    <input type="file" id="pdfInput" accept="application/pdf,image/png,image/jpeg,image/jpg,image/webp" multiple style="display:none;">
   </div>
 
   <!-- ============ DRAW ============ -->
   <div id="draw">
     <div class="topbar">
       <button class="sticker exit-btn" id="exitBtn">← Exit</button>
-      <div class="page-name" id="pageName">Cat</div>
-      <button class="sticker clear-btn" id="clearBtn">🧽 Wipe clean</button>
+      <div class="zoom-controls">
+        <button class="sticker zoom-btn" id="zoomOutBtn">−</button>
+        <button class="sticker zoom-btn" id="zoomInBtn">+</button>
+      </div>
+      <div class="right-controls">
+        <button class="sticker undo-btn disabled" id="undoBtn" title="Undo">↺ Undo</button>
+        <button class="sticker clear-btn" id="clearBtn">🧽 Wipe clean</button>
+      </div>
     </div>
 
     <div class="main-row">
-      <div class="side-dock left" id="shapesDock">
-        <button class="sticker shape-btn selected" data-shape="star">★</button>
-        <button class="sticker shape-btn" data-shape="heart">♥</button>
-        <button class="sticker shape-btn" data-shape="circle">●</button>
-        <button class="sticker shape-btn" data-shape="triangle">▲</button>
-      </div>
-
-      <div class="canvas-wrap">
-        <div id="canvasFrame">
-          <canvas id="drawCanvas"></canvas>
-          <img id="outlineImg" alt="">
+      <div class="draw-container">
+        <div class="canvas-wrap">
+          <div id="canvasFrame">
+            <canvas id="drawCanvas"></canvas>
+            <img id="outlineImg" alt="">
+          </div>
         </div>
+        <div class="color-row" id="colorRow"></div>
       </div>
 
       <div class="side-dock right" id="toolsDock">
         <button class="sticker tool-btn selected" data-tool="brush" title="Thick paintbrush">
-          <svg viewBox="0 0 48 48">
-            <rect x="0" y="0" width="9" height="20" rx="4" fill="#B5651D" transform="rotate(45 4.5 10)"/>
-            <rect x="8" y="12" width="11" height="9" rx="3" fill="#D9D9E3" transform="rotate(45 13.5 16.5)"/>
-            <path d="M16 22 C 10 26 6 32 9 40 C 13 44 20 42 23 35 L 30 20 L 22 16 Z" fill="#fff"/>
-            <circle cx="12" cy="37" r="5" fill="#FF6B6B"/>
-          </svg>
+          <svg viewBox="0 0 512 457.794" xmlns="http://www.w3.org/2000/svg"><path fill="#311300" fill-rule="nonzero" d="M3.927 436.902c14.186-15.021 19.168-37.317 24.042-59.143 8.005-35.841 15.776-70.623 58.144-84.547l.643-.189c13.481-4.211 27.167-4.733 40.71-1.579.36-1.188 1.348-2.427 2.096-3.409l66.041-88.941a11.888 11.888 0 015.4-4.072L441.671 13.441l.546-.388c17.83-13.66 34.269-15.405 46.72-10.689a35.025 35.025 0 0114.349 10.128c3.657 4.308 6.259 9.49 7.625 15.079 3.074 12.566-.196 27.149-11.928 38.168L283.317 288.89a11.904 11.904 0 01-4.956 3.095c-.263.168-.534.326-.813.475-18.296 9.774-31.236 15.44-43.128 20.646-16.813 7.363-31.455 13.775-56.011 29.791a8.316 8.316 0 01-1.634.843c2.326 17.346-1.952 33.604-10.363 47.962-11.902 20.318-32.24 36.627-53.376 46.401-17.22 7.972-35.852 12.687-53.584 15.516-17.352 2.768-33.799 3.715-47.111 4.168-11.387.357-16.463-13.606-8.414-20.885z"/><path fill="#C9C7CD" d="M139.236 295.058l60.17-81.033c.329.297.676.58 1.044.844 25.953 18.71 47.926 43.269 63.593 71.168l.006.011c-37.121 19.03-51.655 20.702-89.997 45.429l-.242-.769c-5.591-17.299-17.56-28.896-34.574-35.65z"/><path fill="#A4A0B1" d="M151.061 300.957c-3.619-2.246-8.097-4.318-11.818-5.936l59.058-82.138c.62.733 1.336 1.401 2.149 1.986a217.744 217.744 0 017.91 5.982l-57.299 80.106z"/><path fill="#E37C5D" d="M274.697 280.599c-16.616-29.727-39.637-55.504-67.268-75.426L448.885 22.998c40.172-31.403 66.263 11.992 41.479 34.45L274.697 280.599z"/><path fill="#CC5E3B" d="M217.652 212.979a233.219 233.219 0 00-10.222-7.806L448.884 22.998c14.177-11.082 26.596-12.841 35.648-9.501l-266.88 199.482z"/><path fill="#F9D98C" d="M11.965 445.801c40.086-41.262 15.674-120.772 77.849-141.206a66.604 66.604 0 0130.25-2.44 66.71 66.71 0 0122.969 7.946 43.555 43.555 0 0115.312 15.115 47.295 47.295 0 014.082 9.147c13.164 40.909-19.255 76.617-54.403 92.872-32.286 14.948-70.217 17.727-96.059 18.607v-.041z"/><path fill="#FFAB45" d="M11.966 445.801c40.086-41.261 15.673-120.772 77.849-141.206a66.6 66.6 0 0130.25-2.44 66.677 66.677 0 0116.746 4.834c-8.906 12.529-22.123 20.299-38.41 25.457-27.286 8.639-39.301 29.041-45.677 55.993-8.456 35.738-9.084 41.727-18.182 56.128-8.148.681-15.78 1.044-22.578 1.275l.002-.041z"/></svg>
         </button>
         <button class="sticker tool-btn" data-tool="marker" title="Medium marker">
-          <svg viewBox="0 0 48 48">
-            <rect x="14" y="4" width="18" height="15" rx="5" fill="#F3722C"/>
-            <rect x="14" y="4" width="18" height="6" rx="3" fill="#fff" opacity="0.45"/>
-            <path d="M14 19 L14 27 L23 42 L32 27 L32 19 Z" fill="#2B2B33"/>
-          </svg>
+          <svg viewBox="0 0 122.88 112.52" xmlns="http://www.w3.org/2000/svg"><g><path d="M30.36,55.98l35.29,35.29c0.47,0.4,1.07,0.62,1.65,0.62c0.51,0,0.99-0.16,1.34-0.51l0.09-0.09l48.08-56.25 c0.5-0.58,0.77-1.29,0.77-1.97c0-0.56-0.2-1.12-0.63-1.55L91.34,5.91c-0.42-0.42-0.95-0.61-1.5-0.61c-0.71,0-1.44,0.28-2.07,0.79 L30.15,52.8l-0.11,0.11c-0.32,0.32-0.46,0.77-0.46,1.25c0,0.58,0.21,1.17,0.59,1.64L30.36,55.98L30.36,55.98z M97.16,37.82 c1.03-1.03,2.71-1.03,3.75,0c1.03,1.03,1.03,2.71,0,3.75L75.39,67.08c-1.03,1.03-2.71,1.03-3.75,0c-1.03-1.03-1.03-2.71,0-3.75 L97.16,37.82L97.16,37.82z M81.82,22.49c1.03-1.03,2.71-1.03,3.75,0c1.03,1.03,1.03,2.71,0,3.75L60.06,51.75 c-1.03,1.03-2.71,1.03-3.75,0c-1.03-1.03-1.03-2.71,0-3.75L81.82,22.49L81.82,22.49z M30.64,105.8l-5.95,5.95 c-0.63,0.63-1.5,0.88-2.32,0.74l-20.01-2.21c-1.45-0.16-2.5-1.47-2.34-2.92c0.07-0.62,0.35-1.17,0.76-1.58l0,0l14.92-14.92 l-1.07-1.07c-1.03-1.03-1.03-2.71,0-3.75l4.69-4.69l0.01,0.01l0.07-0.07c0.19-0.18,0.37-0.39,0.54-0.62 c0.16-0.22,0.3-0.48,0.43-0.75c0.92-1.99,0.54-6.28,0.24-9.63l0.01,0c-0.09-0.96-0.16-1.85-0.2-2.46 c-0.56-4.42,2.26-6.98,5.09-9.51c-0.77-1.25-1.18-2.69-1.19-4.11c-0.02-1.84,0.62-3.67,1.99-5.04c0.13-0.13,0.3-0.28,0.52-0.46 L84.44,1.99C86.02,0.7,87.94,0,89.84,0c1.9,0,3.77,0.68,5.25,2.16l25.61,25.61c1.48,1.48,2.18,3.37,2.18,5.29 c0,1.91-0.71,3.85-2.05,5.41L72.75,94.73c-0.15,0.18-0.28,0.32-0.36,0.4c-1.4,1.4-3.26,2.06-5.13,2.04 c-1.41-0.01-2.84-0.41-4.07-1.17c-2.53,2.84-5.09,5.65-9.51,5.09c-0.91-0.05-1.66-0.12-2.46-0.19l0-0.01 c-3.35-0.3-7.63-0.68-9.63,0.25c-0.28,0.13-0.53,0.27-0.75,0.43c-0.18,0.13-0.36,0.28-0.53,0.45c-0.05,0.06-0.1,0.12-0.16,0.17 l-4.69,4.69c-1.03,1.03-2.71,1.03-3.75,0L30.64,105.8L30.64,105.8z M20.24,87.9l1.07,1.07l11.2,11.2l1.07,1.07l2.89-2.89 c0.4-0.41,0.83-0.78,1.29-1.11c0.51-0.36,1.05-0.67,1.6-0.93c3.26-1.51,8.33-1.06,12.3-0.7l0-0.01c0.98,0.09,1.89,0.17,2.4,0.2 l0.22,0.02c1.73,0.23,3.37-1.6,5-3.43L29.08,62.2c-1.83,1.63-3.67,3.28-3.42,5.01l0.02,0.21c0.05,0.86,0.12,1.61,0.19,2.4h0.01 c0.35,3.96,0.8,9.03-0.71,12.3c-0.26,0.55-0.56,1.09-0.93,1.6c-0.34,0.47-0.73,0.93-1.19,1.36l0.01,0.01L20.24,87.9L20.24,87.9z"/></g></svg>
         </button>
         <button class="sticker tool-btn" data-tool="crayon" title="Thin crayon">
-          <svg viewBox="0 0 48 48">
-            <path d="M10 40 L28 9 Q32 3 37 8 Q42 13 36 17 L15 41 Z" fill="#E63946"/>
-            <path d="M10 40 L15 41 L18 35 L13 33 Z" fill="#fff"/>
-            <line x1="18" y1="30" x2="28" y2="14" stroke="#fff" stroke-width="3.4" stroke-linecap="round"/>
-          </svg>
+          <svg viewBox="0 0 512 512.213" xmlns="http://www.w3.org/2000/svg"><path d="M450.912 5.55l55.54 55.539C510.15 64.788 512 69.655 512 74.514s-1.851 9.727-5.548 13.424l-390.75 390.75a8.511 8.511 0 01-12.037 0l-2.779-2.778-84.588 35.542a8.52 8.52 0 01-9.548-1.733l-4.267-4.267.009-.009a8.504 8.504 0 01-1.839-9.275l35.469-85.022-2.809-2.809a8.511 8.511 0 010-12.037L424.063 5.55A18.935 18.935 0 01437.488 0c4.858 0 9.725 1.851 13.424 5.55zM143.365 438.988l-70.352-70.352-33.682 33.682 70.352 70.352 33.682-33.682zm-47.754-92.949l70.352 70.352L500.434 81.92c4.07-4.071 4.073-10.739 0-14.812l-55.541-55.54c-4.073-4.073-10.738-4.073-14.811 0L95.611 346.039zm260.804-193.6c8.817 8.818 8.815 23.248 0 32.063L222.819 318.098c-8.815 8.815-23.248 8.815-32.063 0v-.001c-8.815-8.815-8.817-23.245 0-32.062l133.596-133.596c8.817-8.817 23.245-8.817 32.063 0zm120.192-46.693l-22.597 22.598-70.352-70.352 22.598-22.598 70.351 70.352zM94.382 469.405l-51.758-51.758-34.118 81.782 4.267 4.267 81.609-34.291z"/></svg>
         </button>
         <button class="sticker tool-btn" data-tool="stamp" title="Stamps">
-          <svg viewBox="0 0 48 48">
-            <path d="M24 4 L29 17 L43 18 L32 27 L36 42 L24 33 L12 42 L16 27 L5 18 L19 17 Z" fill="#FFC93C"/>
-            <circle cx="18" cy="14" r="2.6" fill="#fff" opacity="0.85"/>
-          </svg>
+          <svg viewBox="0 0 480 512.008" xmlns="http://www.w3.org/2000/svg"><path fill="#7F543C" d="M239.113 0c26.655.254 48.769 10.307 65.132 31.867 24.273 31.984 30.016 81.917 22.419 118.412-7.569 36.364-25.346 67.421-30.454 106.186-6.242 47.375 10.333 79.026 38.636 114.991H144.825c28.302-35.965 44.878-67.616 38.635-114.991-5.107-38.764-22.884-69.822-30.453-106.186-7.597-36.495-1.854-86.428 22.419-118.412C191.788 10.307 212.459.254 239.113 0z"/><path fill="#AA734D" d="M303.168 371.456H144.825c28.302-35.965 44.878-67.616 38.636-114.991-5.108-38.764-22.885-69.822-30.455-106.186-7.596-36.495-1.853-86.428 22.42-118.412 12.984-17.108 28.681-26.969 47.928-30.44 19.623 3.471 36.228 13.332 49.213 30.44 24.273 31.984 30.017 81.916 22.42 118.412-7.57 36.365-25.346 67.421-30.454 106.186-6.243 47.375 10.333 79.026 38.635 114.991z"/><path fill="#473121" d="M447.972 462.28v35.399c0 7.881-6.448 14.329-14.329 14.329H45.936c-7.881 0-14.329-6.448-14.329-14.329V462.28h416.365z"/><path fill="#FFC612" d="M46.778 371.674h386.444c25.728 0 46.778 21.05 46.778 46.778v43.828H0v-43.828c0-25.728 21.05-46.778 46.778-46.778z"/><path fill="#FFD60D" d="M461.886 462.279H0v-43.827c0-4.33.599-8.527 1.714-12.513 7.631-5.413 16.936-8.603 26.951-8.603h386.443c25.728 0 46.778 21.05 46.778 46.777v18.166z"/></svg>
         </button>
         <button class="sticker tool-btn" data-tool="eraser" title="Eraser">
-          <svg viewBox="0 0 48 48">
-            <path d="M8 30 L26 12 C 29 9 33 9 36 12 L40 16 C 43 19 43 23 40 26 L28 38 L12 38 C 9 38 7 36 7 34 Z" fill="#FF8FB1"/>
-            <path d="M12 38 L28 38 L21 31 L15 31 Z" fill="#E0638A"/>
-            <line x1="17" y1="21" x2="31" y2="35" stroke="#fff" stroke-width="2.6" opacity="0.65" stroke-linecap="round"/>
-          </svg>
+          <svg viewBox="0 0 512 446.201" xmlns="http://www.w3.org/2000/svg"><g fill-rule="nonzero"><path d="M121.683 218.8c-2.858-2.857-2.629-7.723.512-10.864 3.14-3.141 8.007-3.37 10.864-.512l174.464 174.467c2.857 2.857 2.628 7.724-.513 10.865-3.141 3.14-8.007 3.369-10.864.512L121.683 218.8z"/><path d="M304.071 407.141l-179.668 38.621c-7.248 1.536-14.411-1.059-19.04-6.192l-83.521-83.944c-30.268-30.425-28.351-42.165 1.249-71.674L297.755 10.135c12.341-14.197 37.43-13.072 49.401.83l151.95 152.417c16.511 16.57 17.726 36.066.38 53.365L314.024 401.733a19.918 19.918 0 01-9.958 5.387l.005.021z"/><path fill="#E3504D" d="M299.918 387.549l-179.669 38.622-95.182-95.668c-5.677-5.677-5.677-14.598 0-20.274l287.08-286.195c5.185-5.86 14.445-5.353 19.791 0l155.611 156.092c5.679 5.68 5.676 14.591 0 20.274L299.918 387.549z"/><path fill="#AF413F" d="M309.168 378.299l-22.609-20.198 186.884-192.123 14.106 14.148c5.16 5.396 6.421 11.826 0 20.274L309.168 378.299z"/><path d="M475.163 446.111c-5.544 0-10.041-4.941-10.041-11.034 0-6.094 4.497-11.034 10.041-11.034h18.919c5.544 0 10.04 4.94 10.04 11.034 0 6.093-4.496 11.034-10.04 11.034h-18.919zm-173.12-38.535l-76.601 16.467h217.962c5.545 0 10.041 4.94 10.041 11.034 0 6.093-4.496 11.034-10.041 11.034h-321.28c-6.447.614-12.619-1.948-16.761-6.541l-89.724-90.179c-20.295-20.398-20.555-37.615.185-58.164l92.631-91.796c7.78-7.738 20.331-7.753 28.133-.077l177.357 173.933c7.877 7.746 7.981 20.413.235 28.29-3.734 3.794-7.341 4.969-12.137 5.999z"/><path fill="#E4E5E5" d="M299.918 387.549l-179.669 38.622-95.182-95.668c-5.677-5.677-5.677-14.598 0-20.274l97.496-96.614 177.355 173.934z"/></g></svg>
         </button>
       </div>
-    </div>
 
-    <div class="color-row" id="colorRow"></div>
+      <div class="side-dock right" id="shapesDock" style="display:none;">
+        <button class="sticker tool-btn shape-btn" data-shape="star">★</button>
+        <button class="sticker tool-btn shape-btn" data-shape="heart">♥</button>
+        <button class="sticker tool-btn shape-btn" data-shape="circle">●</button>
+        <button class="sticker tool-btn shape-btn" data-shape="triangle">▲</button>
+      </div>
+    </div>
   </div>
 
+  <div class="modal-backdrop" id="deleteModal">
+    <div class="modal-card">
+      <p id="deleteGateText">Adult Gate: What is 7 + 5?</p>
+      <input type="number" id="deleteMathAnswer" inputmode="numeric" style="font-size:24px; width:100px; text-align:center; margin-bottom:12px; padding:8px; border-radius:12px; border:3px solid var(--sky-deep);">
+      <p id="deleteErrorMsg" style="color:var(--coral); font-size:14px; margin:0 0 12px 0; display:none;">Incorrect answer, try again!</p>
+      <div class="modal-actions">
+        <button class="sticker btn-yes" id="confirmDelete">Delete Page</button>
+        <button class="sticker btn-no" id="cancelDelete">Cancel</button>
+      </div>
+    </div>
+  </div>
+  
   <div class="modal-backdrop" id="clearModal">
     <div class="modal-card">
       <p>Wipe this whole picture clean?</p>
@@ -260,162 +266,9 @@ if (window.pdfjsLib) {
   pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
 }
 
-/* ---------- Animal outline library — simple, rounded, big-eyed "storybook" style ---------- */
-const OUTLINES = {
-cat: `<svg viewBox="0 0 800 600" xmlns="http://www.w3.org/2000/svg">
-  <g fill="none" stroke="#1a1a1a" stroke-width="13" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M540 430 C 640 420 675 350 645 300 C 630 278 605 285 600 315"/>
-    <ellipse cx="400" cy="440" rx="165" ry="130"/>
-    <ellipse cx="400" cy="450" rx="70" ry="90"/>
-    <circle cx="400" cy="255" r="140"/>
-    <path d="M295 165 C 255 100 270 55 325 70 C 350 95 345 140 330 175 Z"/>
-    <path d="M505 165 C 545 100 530 55 475 70 C 450 95 455 140 470 175 Z"/>
-    <circle cx="345" cy="250" r="32"/>
-    <circle cx="455" cy="250" r="32"/>
-    <path d="M312 205 Q 328 190 348 200"/>
-    <path d="M452 200 Q 472 190 488 205"/>
-    <path d="M400 300 Q 385 320 365 310"/>
-    <path d="M400 300 Q 415 320 435 310"/>
-    <path d="M330 290 L 235 280 M330 305 L 230 305 M330 320 L 235 330"/>
-    <path d="M470 290 L 565 280 M470 305 L 570 305 M470 320 L 565 330"/>
-    <ellipse cx="362" cy="545" rx="28" ry="20"/>
-    <ellipse cx="438" cy="545" rx="28" ry="20"/>
-  </g>
-  <g fill="#1a1a1a">
-    <circle cx="345" cy="253" r="12"/>
-    <circle cx="455" cy="253" r="12"/>
-    <path d="M388 285 L412 285 L400 302 Z"/>
-  </g>
-</svg>`,
-bunny: `<svg viewBox="0 0 800 600" xmlns="http://www.w3.org/2000/svg">
-  <g fill="none" stroke="#1a1a1a" stroke-width="13" stroke-linecap="round" stroke-linejoin="round">
-    <ellipse cx="400" cy="450" rx="160" ry="125"/>
-    <circle cx="632" cy="480" r="34"/>
-    <circle cx="400" cy="275" r="118"/>
-    <ellipse cx="345" cy="110" rx="36" ry="120" transform="rotate(-9 345 110)"/>
-    <ellipse cx="345" cy="120" rx="15" ry="82" transform="rotate(-9 345 120)"/>
-    <ellipse cx="455" cy="110" rx="36" ry="120" transform="rotate(9 455 110)"/>
-    <ellipse cx="455" cy="120" rx="15" ry="82" transform="rotate(9 455 120)"/>
-    <circle cx="358" cy="270" r="30"/>
-    <circle cx="442" cy="270" r="30"/>
-    <path d="M328 228 Q 344 213 362 222"/>
-    <path d="M438 222 Q 456 213 472 228"/>
-    <rect x="386" y="322" width="12" height="20" rx="4"/>
-    <rect x="404" y="322" width="12" height="20" rx="4"/>
-    <ellipse cx="360" cy="550" rx="26" ry="18"/>
-    <ellipse cx="440" cy="550" rx="26" ry="18"/>
-  </g>
-  <g fill="#1a1a1a">
-    <circle cx="358" cy="273" r="11"/>
-    <circle cx="442" cy="273" r="11"/>
-    <ellipse cx="400" cy="308" rx="10" ry="7"/>
-  </g>
-</svg>`,
-turtle: `<svg viewBox="0 0 800 600" xmlns="http://www.w3.org/2000/svg">
-  <g fill="none" stroke="#1a1a1a" stroke-width="13" stroke-linecap="round" stroke-linejoin="round">
-    <line x1="215" y1="470" x2="185" y2="515"/>
-    <line x1="310" y1="500" x2="295" y2="548"/>
-    <line x1="430" y1="500" x2="445" y2="548"/>
-    <line x1="525" y1="470" x2="555" y2="515"/>
-    <path d="M150 370 C 120 375 100 395 108 415"/>
-    <ellipse cx="365" cy="350" rx="210" ry="155"/>
-    <path d="M195 330 Q 365 265 535 330"/>
-    <path d="M215 400 Q 365 455 515 400"/>
-    <path d="M365 200 L 365 500"/>
-    <circle cx="600" cy="300" r="68"/>
-    <path d="M562 252 Q 578 238 598 246"/>
-    <path d="M560 315 Q 578 328 596 318"/>
-  </g>
-  <g fill="#1a1a1a">
-    <circle cx="626" cy="288" r="11"/>
-  </g>
-</svg>`,
-giraffe: `<svg viewBox="0 0 800 600" xmlns="http://www.w3.org/2000/svg">
-  <g fill="none" stroke="#1a1a1a" stroke-width="13" stroke-linecap="round" stroke-linejoin="round">
-    <line x1="335" y1="545" x2="325" y2="585"/>
-    <ellipse cx="322" cy="588" rx="14" ry="9"/>
-    <line x1="368" y1="550" x2="362" y2="588"/>
-    <ellipse cx="360" cy="591" rx="14" ry="9"/>
-    <line x1="410" y1="550" x2="416" y2="588"/>
-    <ellipse cx="418" cy="591" rx="14" ry="9"/>
-    <line x1="443" y1="545" x2="453" y2="585"/>
-    <ellipse cx="455" cy="588" rx="14" ry="9"/>
-    <ellipse cx="390" cy="465" rx="112" ry="68"/>
-    <path d="M355 415 C 335 320 322 225 368 145"/>
-    <path d="M425 415 C 445 320 452 225 402 145"/>
-    <ellipse cx="385" cy="118" rx="62" ry="48"/>
-    <ellipse cx="385" cy="158" rx="30" ry="20"/>
-    <ellipse cx="335" cy="100" rx="18" ry="26" transform="rotate(-25 335 100)"/>
-    <ellipse cx="435" cy="100" rx="18" ry="26" transform="rotate(25 435 100)"/>
-    <path d="M362 78 L 357 40" /><path d="M410 78 L 415 40"/>
-    <circle cx="357" cy="35" r="9"/>
-    <circle cx="415" cy="35" r="9"/>
-    <path d="M352 105 Q 364 92 380 100"/>
-    <ellipse cx="352" cy="230" rx="18" ry="14"/>
-    <ellipse cx="425" cy="270" rx="18" ry="14"/>
-    <ellipse cx="345" cy="330" rx="17" ry="13"/>
-    <ellipse cx="420" cy="375" rx="17" ry="13"/>
-    <ellipse cx="355" cy="440" rx="16" ry="13"/>
-    <ellipse cx="435" cy="455" rx="16" ry="13"/>
-    <path d="M500 445 C 545 465 558 500 542 528 C 528 540 520 525 528 510"/>
-  </g>
-  <g fill="#1a1a1a">
-    <circle cx="367" cy="122" r="10"/>
-  </g>
-</svg>`,
-whale: `<svg viewBox="0 0 800 600" xmlns="http://www.w3.org/2000/svg">
-  <g fill="none" stroke="#1a1a1a" stroke-width="13" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M150 330 C 150 225 265 175 405 175 C 565 175 685 235 705 315 C 715 355 695 395 655 415 C 565 462 385 472 285 452 C 195 432 150 385 150 330 Z"/>
-    <path d="M675 300 C 728 258 780 253 775 300 C 780 348 728 352 675 322 Z"/>
-    <path d="M310 430 C 285 465 275 495 305 500 C 335 480 340 445 320 420 Z"/>
-    <circle cx="280" cy="275" r="20"/>
-    <path d="M250 235 Q 265 220 285 228"/>
-    <path d="M205 335 C 265 375 350 375 410 350"/>
-    <path d="M330 150 Q 330 110 310 80"/>
-    <path d="M370 150 Q 375 100 360 60"/>
-    <path d="M300 155 Q 295 125 280 105"/>
-    <circle cx="330" cy="170" r="9"/>
-  </g>
-  <g fill="#1a1a1a">
-    <circle cx="284" cy="278" r="9"/>
-  </g>
-</svg>`,
-parrot: `<svg viewBox="0 0 800 600" xmlns="http://www.w3.org/2000/svg">
-  <g fill="none" stroke="#1a1a1a" stroke-width="13" stroke-linecap="round" stroke-linejoin="round">
-    <line x1="170" y1="555" x2="610" y2="555"/>
-    <line x1="355" y1="522" x2="352" y2="552"/>
-    <line x1="425" y1="522" x2="428" y2="552"/>
-    <path d="M352 552 L 337 562 M352 552 L 367 562"/>
-    <path d="M428 552 L 413 562 M428 552 L 443 562"/>
-    <ellipse cx="390" cy="385" rx="112" ry="140"/>
-    <circle cx="378" cy="195" r="88"/>
-    <path d="M355 120 Q 335 85 355 65" />
-    <path d="M385 118 Q 375 75 400 60"/>
-    <path d="M415 122 Q 420 85 448 78"/>
-    <path d="M448 195 C 508 198 520 228 480 250 C 460 256 442 240 445 215 Z"/>
-    <circle cx="348" cy="180" r="17"/>
-    <path d="M325 155 Q 340 142 358 150"/>
-    <path d="M310 285 C 235 305 205 385 248 465 C 292 505 355 483 366 420 C 372 368 355 312 310 285 Z"/>
-    <path d="M295 330 C 270 360 265 400 285 435"/>
-    <path d="M325 320 C 305 355 302 395 318 430"/>
-    <path d="M400 490 C 385 530 370 560 340 585"/>
-    <path d="M430 495 C 428 535 422 565 405 592"/>
-    <path d="M460 485 C 470 525 475 555 465 585"/>
-  </g>
-  <g fill="#1a1a1a">
-    <circle cx="351" cy="183" r="8"/>
-  </g>
-</svg>`
-};
-
-const ANIMALS = [
-  { id:"cat", name:"Cat" },
-  { id:"bunny", name:"Bunny" },
-  { id:"turtle", name:"Turtle" },
-  { id:"giraffe", name:"Giraffe" },
-  { id:"whale", name:"Whale" },
-  { id:"parrot", name:"Parrot" },
-];
+/* ---------- Animal outline library disabled — custom imported pages only ---------- */
+const OUTLINES = {};
+const ANIMALS = [];
 
 const COLORS = [
   {name:"Red", v:"#E63946"}, {name:"Orange", v:"#F3722C"}, {name:"Yellow", v:"#F9C74F"},
@@ -439,6 +292,9 @@ let currentColor = COLORS[0].v;
 let drawing = false;
 let lastPt = null;
 let lastStampPt = null;
+let lastDabPt = null;
+let undoStack = [];
+const UNDO_MAX = 15;
 
 const drawCanvas = document.getElementById("drawCanvas");
 const ctx = drawCanvas.getContext("2d");
@@ -450,10 +306,7 @@ function hasProgress(id){ return !!store.get(strokesKey(id), null); }
 
 function allPages(){
   const custom = store.get(CUSTOM_KEY, []);
-  return [
-    ...ANIMALS.map(a => ({id:a.id, name:a.name, custom:false})),
-    ...custom.map(p => ({id:p.id, name:p.name, custom:true, outline:p.outline}))
-  ];
+  return custom.map(p => ({id:p.id, name:p.name, custom:true, outline:p.outline}));
 }
 
 /* ---------- Home carousel rendering (loops infinitely via lead/trail clones) ---------- */
@@ -483,10 +336,7 @@ function buildCard(p, isClone){
   if (p.custom && !isClone){
     card.querySelector(".del").addEventListener("click", (e)=>{
       e.stopPropagation();
-      const updated = store.get(CUSTOM_KEY, []).filter(x=>x.id!==p.id);
-      store.set(CUSTOM_KEY, updated);
-      localStorage.removeItem(strokesKey(p.id));
-      renderHome();
+      openDeleteModal(p.id);
     });
   }
   return card;
@@ -497,6 +347,22 @@ function renderHome(scrollToId){
   carousel.innerHTML = "";
   const dotsEl = document.getElementById("dots");
   dotsEl.innerHTML = "";
+
+  if (lcPages.length === 0) {
+    const emptyCard = document.createElement("div");
+    emptyCard.className = "page-card";
+    emptyCard.style.cursor = "pointer";
+    emptyCard.innerHTML = `
+      <div style="font-size:64px; margin-bottom:12px;">➕</div>
+      <div class="name" style="font-size:24px;">Import a Coloring Page</div>
+      <p style="font-size:15px; color:#666; margin-top:6px;">Tap here to add a PDF or Image</p>
+    `;
+    emptyCard.addEventListener("click", () => {
+      document.getElementById("pdfInput").click();
+    });
+    carousel.appendChild(emptyCard);
+    return;
+  }
 
   const loop = lcPages.length > 1;
   if (loop) carousel.appendChild(buildCard(lcPages[lcPages.length - 1], true));
@@ -577,27 +443,60 @@ function renderColors(){
   });
 }
 
-document.querySelectorAll(".tool-btn").forEach(b=>{
+let currentZoom = 1;
+
+const zoomIn = document.getElementById("zoomInBtn");
+const zoomOut = document.getElementById("zoomOutBtn");
+
+if (zoomIn) {
+  zoomIn.addEventListener("click", ()=>{
+    currentZoom = Math.min(2.0, currentZoom + 0.15);
+    applyZoom();
+  });
+}
+if (zoomOut) {
+  zoomOut.addEventListener("click", ()=>{
+    currentZoom = Math.max(0.6, currentZoom - 0.15);
+    applyZoom();
+  });
+}
+
+function applyZoom(){
+  if (canvasFrame) {
+    canvasFrame.style.transform = `scale(${currentZoom})`;
+    canvasFrame.style.transformOrigin = "center center";
+  }
+}
+
+document.querySelectorAll("#toolsDock .tool-btn").forEach(b=>{
   b.addEventListener("click", ()=>{
     currentTool = b.dataset.tool;
-    document.querySelectorAll(".tool-btn").forEach(el=>el.classList.remove("selected"));
-    b.classList.add("selected");
-    document.getElementById("shapesDock").classList.toggle("show", currentTool==="stamp");
+    if (currentTool === "stamp"){
+      document.getElementById("toolsDock").style.display = "none";
+      document.getElementById("shapesDock").style.display = "flex";
+    } else {
+      document.querySelectorAll("#toolsDock .tool-btn").forEach(el=>el.classList.remove("selected"));
+      b.classList.add("selected");
+    }
   });
 });
-document.querySelectorAll(".shape-btn").forEach(b=>{
+
+document.querySelectorAll("#shapesDock .shape-btn").forEach(b=>{
   b.addEventListener("click", ()=>{
     currentShape = b.dataset.shape;
-    document.querySelectorAll(".shape-btn").forEach(el=>el.classList.remove("selected"));
-    b.classList.add("selected");
+    document.getElementById("shapesDock").style.display = "none";
+    document.getElementById("toolsDock").style.display = "flex";
+    document.querySelectorAll("#toolsDock .tool-btn").forEach(el=>el.classList.remove("selected"));
+    const stampBtn = document.querySelector('#toolsDock [data-tool="stamp"]');
+    if (stampBtn) stampBtn.classList.add("selected");
   });
 });
 
 /* ---------- Canvas sizing ---------- */
 function sizeCanvasFrame(){
   const wrap = document.querySelector(".canvas-wrap");
-  const wW = wrap.clientWidth - 20;
-  const wH = wrap.clientHeight - 12;
+  const wW = wrap.clientWidth;
+  const wH = wrap.clientHeight;
   const targetRatio = 4/3;
   let w = wW, h = w/targetRatio;
   if (h > wH){ h = wH; w = h*targetRatio; }
@@ -622,7 +521,10 @@ window.addEventListener("resize", ()=>{ if(currentPageId) sizeCanvasFrame(); });
 /* ---------- Open / exit a page ---------- */
 function openPage(page){
   currentPageId = page.id;
-  document.getElementById("pageName").textContent = page.name;
+  currentZoom = 1;
+  applyZoom();
+  undoStack = [];
+  updateUndoBtnState();
   document.getElementById("home").style.display = "none";
   document.getElementById("draw").classList.add("active");
 
@@ -645,6 +547,32 @@ function saveProgress(){
   catch(e){ console.warn("Could not save progress", e); }
 }
 
+function updateUndoBtnState(){
+  document.getElementById("undoBtn").classList.toggle("disabled", undoStack.length === 0);
+}
+
+function pushUndoSnapshot(){
+  try{
+    undoStack.push(drawCanvas.toDataURL("image/png"));
+    if (undoStack.length > UNDO_MAX) undoStack.shift();
+    updateUndoBtnState();
+  }catch(e){ console.warn("Could not capture undo snapshot", e); }
+}
+
+function performUndo(){
+  if (undoStack.length === 0) return;
+  const prev = undoStack.pop();
+  const img = new Image();
+  img.onload = ()=>{
+    ctx.clearRect(0,0,drawCanvas.width,drawCanvas.height);
+    ctx.drawImage(img, 0,0, drawCanvas.width, drawCanvas.height);
+    saveProgress();
+    updateUndoBtnState();
+  };
+  img.src = prev;
+}
+document.getElementById("undoBtn").addEventListener("click", performUndo);
+
 document.getElementById("exitBtn").addEventListener("click", ()=>{
   saveProgress();
   document.getElementById("draw").classList.remove("active");
@@ -662,9 +590,15 @@ document.getElementById("cancelClear").addEventListener("click", ()=>{
   document.getElementById("clearModal").classList.remove("show");
 });
 document.getElementById("confirmClear").addEventListener("click", ()=>{
+  pushUndoSnapshot();
   ctx.clearRect(0,0,drawCanvas.width,drawCanvas.height);
   saveProgress();
   document.getElementById("clearModal").classList.remove("show");
+});
+document.getElementById("clearModal").addEventListener("click", (e)=>{
+  if (e.target.id === "clearModal") {
+    document.getElementById("clearModal").classList.remove("show");
+  }
 });
 
 /* ---------- Drawing engine ---------- */
@@ -676,9 +610,8 @@ function getPoint(evt){
   return { x:(t.clientX-rect.left)*scaleX, y:(t.clientY-rect.top)*scaleY };
 }
 
-/* Doubled thicknesses (diameter in canvas px) */
-const TOOL_WIDTH = { brush:92, marker:52, crayon:20 };
-const TOOL_OPACITY = { brush:0.92, marker:1, crayon:0.88 };
+const TOOL_WIDTH = { brush:92, marker:52, crayon:24 };
+const TOOL_OPACITY = { brush:0.92, marker:1.0, crayon:0.88 };
 const TOOL_MIXWEIGHT = { brush:0.5, marker:0.55, crayon:0.55 };
 
 function hexToRgb(hex){
@@ -686,9 +619,12 @@ function hexToRgb(hex){
   return [(v>>16)&255, (v>>8)&255, v&255];
 }
 
-/* Paints one round "dab": where canvas already has paint, blend the new color
-   into the existing color (like real paint mixing); where it's blank, lay
-   down the new color at the tool's normal opacity. */
+/* Paints one round "dab": where the canvas already has paint, blend the new
+   color into what's there (so red over blue makes purple, like real paint);
+   where it's blank, lay the new color down at the tool's normal opacity.
+   Stamping dabs along the path (instead of one continuous ctx.stroke per
+   mousemove segment) avoids the dark overlap blotches you get from drawing
+   lots of small translucent strokes that cross back over each other. */
 function paintDab(cx, cy, radius, rgb, opacity, mixWeight){
   const x0 = Math.max(0, Math.floor(cx-radius));
   const y0 = Math.max(0, Math.floor(cy-radius));
@@ -722,8 +658,6 @@ function paintDab(cx, cy, radius, rgb, opacity, mixWeight){
   }
   ctx.putImageData(imgData, x0, y0);
 }
-
-let lastDabPt = null;
 
 function paintTexture(cx,cy,radius,rgb,mixW){
   for(let i=0;i<2;i++){
@@ -798,6 +732,7 @@ function drawShape(cx, cy, shape, size, color){
 function handleStart(evt){
   evt.preventDefault();
   drawing = true;
+  pushUndoSnapshot();
   const p = getPoint(evt);
   lastPt = p;
   lastDabPt = null;
@@ -851,74 +786,157 @@ document.addEventListener("visibilitychange", ()=>{ if(document.hidden) saveProg
 document.getElementById("importBtn").addEventListener("click", ()=>{
   document.getElementById("pdfInput").click();
 });
-document.getElementById("pdfInput").addEventListener("change", async (e)=>{
-  const file = e.target.files[0];
-  if (!file) return;
-  try{
-    let outlineData;
-    if (file.type === "application/pdf"){
-      if (!window.pdfjsLib){
-        alert("Could not load the PDF reader. Please check your internet connection and try again.");
-        return;
-      }
-      const buf = await file.arrayBuffer();
-      const pdf = await pdfjsLib.getDocument({data:buf}).promise;
-      const page = await pdf.getPage(1);
-      const viewport = page.getViewport({scale: 2});
-      const tmp = document.createElement("canvas");
-      tmp.width = viewport.width; tmp.height = viewport.height;
-      await page.render({canvasContext: tmp.getContext("2d"), viewport}).promise;
-      outlineData = tmp.toDataURL("image/png");
-    } else if (file.type.startsWith("image/")){
-      const rawDataUrl = await new Promise((res, rej)=>{
-        const reader = new FileReader();
-        reader.onload = ()=>res(reader.result);
-        reader.onerror = rej;
-        reader.readAsDataURL(file);
-      });
-      const img = await new Promise((res, rej)=>{
-        const im = new Image();
-        im.onload = ()=>res(im);
-        im.onerror = rej;
-        im.src = rawDataUrl;
-      });
-      const maxDim = 1400;
-      let w = img.width, h = img.height;
-      if (w > maxDim || h > maxDim){
-        const scale = maxDim / Math.max(w,h);
-        w = Math.round(w*scale); h = Math.round(h*scale);
-      }
-      const tmp = document.createElement("canvas");
-      tmp.width = w; tmp.height = h;
-      tmp.getContext("2d").drawImage(img, 0, 0, w, h);
-      outlineData = tmp.toDataURL("image/png");
-    } else {
-      alert("Please choose a PDF or image file.");
-      return;
+async function fileToOutlineData(file){
+  if (file.type === "application/pdf"){
+    if (!window.pdfjsLib){
+      throw new Error("PDF reader not available");
     }
+    const buf = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({data:buf}).promise;
+    const page = await pdf.getPage(1);
+    const viewport = page.getViewport({scale: 2});
+    const tmp = document.createElement("canvas");
+    tmp.width = viewport.width; tmp.height = viewport.height;
+    await page.render({canvasContext: tmp.getContext("2d"), viewport}).promise;
+    return tmp.toDataURL("image/png");
+  } else if (file.type.startsWith("image/")){
+    const rawDataUrl = await new Promise((res, rej)=>{
+      const reader = new FileReader();
+      reader.onload = ()=>res(reader.result);
+      reader.onerror = rej;
+      reader.readAsDataURL(file);
+    });
+    const img = await new Promise((res, rej)=>{
+      const im = new Image();
+      im.onload = ()=>res(im);
+      im.onerror = rej;
+      im.src = rawDataUrl;
+    });
+    const maxDim = 1400;
+    let w = img.width, h = img.height;
+    if (w > maxDim || h > maxDim){
+      const scale = maxDim / Math.max(w,h);
+      w = Math.round(w*scale); h = Math.round(h*scale);
+    }
+    const tmp = document.createElement("canvas");
+    tmp.width = w; tmp.height = h;
+    tmp.getContext("2d").drawImage(img, 0, 0, w, h);
+    return tmp.toDataURL("image/png");
+  } else {
+    throw new Error("Unsupported file type: " + file.type);
+  }
+}
 
-    const id = "page_" + Date.now();
-    const name = file.name.replace(/\.[^.]+$/,"").slice(0,20) || "Imported";
+document.getElementById("pdfInput").addEventListener("change", async (e)=>{
+  const files = Array.from(e.target.files || []);
+  if (!files.length) return;
+
+  const importBtn = document.getElementById("importBtn");
+  const isBulk = files.length > 1;
+  if (isBulk){
+    importBtn.style.pointerEvents = "none";
+    importBtn.style.opacity = "0.6";
+  }
+
+  const imported = [];
+  let failCount = 0;
+
+  for (const file of files){
+    try{
+      const outlineData = await fileToOutlineData(file);
+      const id = "page_" + Date.now() + "_" + Math.random().toString(36).slice(2,7);
+      const name = file.name.replace(/\.[^.]+$/,"").slice(0,20) || "Imported";
+      imported.push({id, name, outline: outlineData, createdAt: Date.now()});
+    }catch(err){
+      console.error(err);
+      failCount++;
+    }
+  }
+
+  if (imported.length){
     const list = store.get(CUSTOM_KEY, []);
-    list.push({id, name, outline: outlineData, createdAt: Date.now()});
+    list.push(...imported);
     store.set(CUSTOM_KEY, list);
-    e.target.value = "";
-    openPage({id, name, custom:true, outline: outlineData});
-  }catch(err){
-    console.error(err);
+  }
+
+  e.target.value = "";
+  if (isBulk){
+    importBtn.style.pointerEvents = "";
+    importBtn.style.opacity = "";
+  }
+
+  if (!imported.length){
     alert("That file couldn't be opened. Please choose a PDF or image coloring page.");
+    return;
+  }
+  if (failCount){
+    alert(`${imported.length} page${imported.length===1?'':'s'} imported. ${failCount} file${failCount===1?'':'s'} couldn't be opened.`);
+  }
+
+  if (imported.length === 1 && !failCount){
+    openPage(imported[0]);
+  } else {
+    renderHome(imported[0].id);
+  }
+});
+
+/* ---------- Delete Modal & Parent Gate ---------- */
+let pendingDeleteId = null;
+let currentMathAnswer = 0;
+
+function closeDeleteModal(){
+  document.getElementById("deleteModal").classList.remove("show");
+  document.getElementById("deleteErrorMsg").style.display = "none";
+  pendingDeleteId = null;
+}
+
+function openDeleteModal(pageId){
+  pendingDeleteId = pageId;
+  const num1 = Math.floor(Math.random() * 8) + 3;
+  const num2 = Math.floor(Math.random() * 8) + 3;
+  currentMathAnswer = num1 + num2;
+  document.getElementById("deleteGateText").textContent = `Adult Gate: What is ${num1} + ${num2}?`;
+  document.getElementById("deleteMathAnswer").value = "";
+  document.getElementById("deleteErrorMsg").style.display = "none";
+  document.getElementById("deleteModal").classList.add("show");
+}
+
+/* Close modal when clicking backdrop outside card */
+document.getElementById("deleteModal").addEventListener("click", (e)=>{
+  if (e.target.id === "deleteModal") {
+    closeDeleteModal();
+  }
+});
+
+document.getElementById("cancelDelete").addEventListener("click", closeDeleteModal);
+
+document.getElementById("confirmDelete").addEventListener("click", ()=>{
+  const input = parseInt(document.getElementById("deleteMathAnswer").value, 10);
+  if (input === currentMathAnswer){
+    if (pendingDeleteId){
+      const updated = store.get(CUSTOM_KEY, []).filter(x=>x.id!==pendingDeleteId);
+      store.set(CUSTOM_KEY, updated);
+      localStorage.removeItem(strokesKey(pendingDeleteId));
+      renderHome();
+    }
+    closeDeleteModal();
+  } else {
+    document.getElementById("deleteErrorMsg").style.display = "block";
+    document.getElementById("deleteMathAnswer").value = "";
+    document.getElementById("deleteMathAnswer").focus();
   }
 });
 
 /* ---------- Init ---------- */
 renderColors();
 renderHome();
-
-if ("serviceWorker" in navigator){
-  window.addEventListener("load", ()=>{
-    navigator.serviceWorker.register("service-worker.js").catch(()=>{});
-  });
-}
+  
+// Comment these out while active testing:
+//if ("serviceWorker" in navigator){
+  //window.addEventListener("load", ()=>{
+    //navigator.serviceWorker.register("service-worker.js").catch(()=>{});
+  //});
+//}
 </script>
 </body>
 </html>
