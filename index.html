@@ -519,6 +519,23 @@ function sizeCanvasFrame(){
 window.addEventListener("resize", ()=>{ if(currentPageId) sizeCanvasFrame(); });
 
 /* ---------- Open / exit a page ---------- */
+let outlineRetryTimer = null;
+
+function loadOutlineWithRetry(src){
+  let retried = false;
+  clearTimeout(outlineRetryTimer);
+  outlineImg.onerror = () => {
+    if (!retried){ retried = true; outlineImg.src = src; }
+  };
+  outlineImg.src = src;
+  outlineRetryTimer = setTimeout(() => {
+    if (!retried && !outlineImg.complete){
+      retried = true;
+      outlineImg.src = src;
+    }
+  }, 700);
+}
+
 function openPage(page){
   currentPageId = page.id;
   currentZoom = 1;
@@ -528,7 +545,7 @@ function openPage(page){
   document.getElementById("home").style.display = "none";
   document.getElementById("draw").classList.add("active");
 
-  outlineImg.src = page.custom ? page.outline : ("data:image/svg+xml;utf8," + encodeURIComponent(OUTLINES[page.id]));
+  loadOutlineWithRetry(page.custom ? page.outline : ("data:image/svg+xml;utf8," + encodeURIComponent(OUTLINES[page.id])));
 
   sizeCanvasFrame();
 
@@ -729,7 +746,11 @@ function drawShape(cx, cy, shape, size, color){
   }
 }
 
+let activePointerId = null;
+
 function handleStart(evt){
+  if (activePointerId !== null && evt.pointerId !== activePointerId) return;
+  activePointerId = evt.pointerId;
   evt.preventDefault();
   drawing = true;
   pushUndoSnapshot();
@@ -747,7 +768,7 @@ function handleStart(evt){
   }
 }
 function handleMove(evt){
-  if (!drawing) return;
+  if (!drawing || evt.pointerId !== activePointerId) return;
   evt.preventDefault();
   const p = getPoint(evt);
   if (currentTool === "stamp"){
@@ -766,9 +787,10 @@ function handleMove(evt){
     lastPt = p;
   }
 }
-function handleEnd(){
-  if (!drawing) return;
+function handleEnd(evt){
+  if (!drawing || (evt && evt.pointerId !== activePointerId)) return;
   drawing = false; lastPt = null; lastStampPt = null; lastDabPt = null;
+  activePointerId = null;
   saveProgress();
 }
 
@@ -776,9 +798,6 @@ canvasFrame.addEventListener("pointerdown", handleStart);
 canvasFrame.addEventListener("pointermove", handleMove);
 window.addEventListener("pointerup", handleEnd);
 window.addEventListener("pointercancel", handleEnd);
-canvasFrame.addEventListener("touchstart", handleStart, {passive:false});
-canvasFrame.addEventListener("touchmove", handleMove, {passive:false});
-canvasFrame.addEventListener("touchend", handleEnd, {passive:false});
 
 document.addEventListener("visibilitychange", ()=>{ if(document.hidden) saveProgress(); });
 
