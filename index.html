@@ -7,7 +7,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Coloring">
 <meta name="theme-color" content="#5EC3E8">
-<title>Lucy Colors</title>
+<title>Little Colors</title>
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <style>
@@ -171,7 +171,7 @@
         </svg>
         Import
       </button>
-      <div class="home-title">🎨 Lucy Colors</div>
+      <div class="home-title">🎨 Little Colors</div>
     </div>
 
     <div class="carousel-wrap">
@@ -329,12 +329,12 @@ function buildCard(p, isClone){
     </div>
     <div class="name">${p.name}</div>
   `;
-  card.addEventListener("click", (e)=>{
+  card.addEventListener("pointerup", (e)=>{
     if (e.target.closest(".del")) return;
     openPage(p);
   });
   if (p.custom && !isClone){
-    card.querySelector(".del").addEventListener("click", (e)=>{
+    card.querySelector(".del").addEventListener("pointerup", (e)=>{
       e.stopPropagation();
       openDeleteModal(p.id);
     });
@@ -357,7 +357,7 @@ function renderHome(scrollToId){
       <div class="name" style="font-size:24px;">Import a Coloring Page</div>
       <p style="font-size:15px; color:#666; margin-top:6px;">Tap here to add a PDF or Image</p>
     `;
-    emptyCard.addEventListener("click", () => {
+    emptyCard.addEventListener("pointerup", () => {
       document.getElementById("pdfInput").click();
     });
     carousel.appendChild(emptyCard);
@@ -418,10 +418,10 @@ carousel.addEventListener("scroll", ()=>{
   carousel._t = window.setTimeout(updateDots, 60);
 });
 
-document.getElementById("prevBtn").addEventListener("click", ()=>{
+document.getElementById("prevBtn").addEventListener("pointerup", ()=>{
   carousel.scrollBy({left: -cardStep(), behavior:"smooth"});
 });
-document.getElementById("nextBtn").addEventListener("click", ()=>{
+document.getElementById("nextBtn").addEventListener("pointerup", ()=>{
   carousel.scrollBy({left: cardStep(), behavior:"smooth"});
 });
 
@@ -434,7 +434,7 @@ function renderColors(){
     b.className = "sticker color-swatch" + (i===0 ? " selected":"");
     b.style.background = c.v;
     b.title = c.name;
-    b.addEventListener("click", ()=>{
+    b.addEventListener("pointerup", ()=>{
       currentColor = c.v;
       document.querySelectorAll(".color-swatch").forEach(el=>el.classList.remove("selected"));
       b.classList.add("selected");
@@ -449,13 +449,13 @@ const zoomIn = document.getElementById("zoomInBtn");
 const zoomOut = document.getElementById("zoomOutBtn");
 
 if (zoomIn) {
-  zoomIn.addEventListener("click", ()=>{
+  zoomIn.addEventListener("pointerup", ()=>{
     currentZoom = Math.min(2.0, currentZoom + 0.15);
     applyZoom();
   });
 }
 if (zoomOut) {
-  zoomOut.addEventListener("click", ()=>{
+  zoomOut.addEventListener("pointerup", ()=>{
     currentZoom = Math.max(0.6, currentZoom - 0.15);
     applyZoom();
   });
@@ -469,7 +469,7 @@ function applyZoom(){
 }
 
 document.querySelectorAll("#toolsDock .tool-btn").forEach(b=>{
-  b.addEventListener("click", ()=>{
+  b.addEventListener("pointerup", ()=>{
     currentTool = b.dataset.tool;
     if (currentTool === "stamp"){
       document.getElementById("toolsDock").style.display = "none";
@@ -482,7 +482,7 @@ document.querySelectorAll("#toolsDock .tool-btn").forEach(b=>{
 });
 
 document.querySelectorAll("#shapesDock .shape-btn").forEach(b=>{
-  b.addEventListener("click", ()=>{
+  b.addEventListener("pointerup", ()=>{
     currentShape = b.dataset.shape;
     document.getElementById("shapesDock").style.display = "none";
     document.getElementById("toolsDock").style.display = "flex";
@@ -524,14 +524,24 @@ let outlineRetryTimer = null;
 function loadOutlineWithRetry(src){
   let retried = false;
   clearTimeout(outlineRetryTimer);
-  outlineImg.onerror = () => {
-    if (!retried){ retried = true; outlineImg.src = src; }
-  };
+
+  function forceReload(){
+    if (retried) return;
+    retried = true;
+    // Reassigning the exact same src value is often silently ignored by
+    // the browser (no visible change, no reload attempt). Clearing it
+    // first guarantees the next assignment is seen as a real change.
+    outlineImg.src = "";
+    requestAnimationFrame(() => {
+      outlineImg.src = src;
+    });
+  }
+
+  outlineImg.onerror = forceReload;
   outlineImg.src = src;
   outlineRetryTimer = setTimeout(() => {
     if (!retried && !outlineImg.complete){
-      retried = true;
-      outlineImg.src = src;
+      forceReload();
     }
   }, 700);
 }
@@ -588,9 +598,9 @@ function performUndo(){
   };
   img.src = prev;
 }
-document.getElementById("undoBtn").addEventListener("click", performUndo);
+document.getElementById("undoBtn").addEventListener("pointerup", performUndo);
 
-document.getElementById("exitBtn").addEventListener("click", ()=>{
+document.getElementById("exitBtn").addEventListener("pointerup", ()=>{
   saveProgress();
   document.getElementById("draw").classList.remove("active");
   document.getElementById("home").style.display = "flex";
@@ -600,19 +610,19 @@ document.getElementById("exitBtn").addEventListener("click", ()=>{
 });
 
 /* ---------- Clear page ---------- */
-document.getElementById("clearBtn").addEventListener("click", ()=>{
+document.getElementById("clearBtn").addEventListener("pointerup", ()=>{
   document.getElementById("clearModal").classList.add("show");
 });
-document.getElementById("cancelClear").addEventListener("click", ()=>{
+document.getElementById("cancelClear").addEventListener("pointerup", ()=>{
   document.getElementById("clearModal").classList.remove("show");
 });
-document.getElementById("confirmClear").addEventListener("click", ()=>{
+document.getElementById("confirmClear").addEventListener("pointerup", ()=>{
   pushUndoSnapshot();
   ctx.clearRect(0,0,drawCanvas.width,drawCanvas.height);
   saveProgress();
   document.getElementById("clearModal").classList.remove("show");
 });
-document.getElementById("clearModal").addEventListener("click", (e)=>{
+document.getElementById("clearModal").addEventListener("pointerup", (e)=>{
   if (e.target.id === "clearModal") {
     document.getElementById("clearModal").classList.remove("show");
   }
@@ -802,7 +812,7 @@ window.addEventListener("pointercancel", handleEnd);
 document.addEventListener("visibilitychange", ()=>{ if(document.hidden) saveProgress(); });
 
 /* ---------- PDF import ---------- */
-document.getElementById("importBtn").addEventListener("click", ()=>{
+document.getElementById("importBtn").addEventListener("pointerup", ()=>{
   document.getElementById("pdfInput").click();
 });
 async function fileToOutlineData(file){
@@ -921,15 +931,15 @@ function openDeleteModal(pageId){
 }
 
 /* Close modal when clicking backdrop outside card */
-document.getElementById("deleteModal").addEventListener("click", (e)=>{
+document.getElementById("deleteModal").addEventListener("pointerup", (e)=>{
   if (e.target.id === "deleteModal") {
     closeDeleteModal();
   }
 });
 
-document.getElementById("cancelDelete").addEventListener("click", closeDeleteModal);
+document.getElementById("cancelDelete").addEventListener("pointerup", closeDeleteModal);
 
-document.getElementById("confirmDelete").addEventListener("click", ()=>{
+document.getElementById("confirmDelete").addEventListener("pointerup", ()=>{
   const input = parseInt(document.getElementById("deleteMathAnswer").value, 10);
   if (input === currentMathAnswer){
     if (pendingDeleteId){
