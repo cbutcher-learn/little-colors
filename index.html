@@ -90,10 +90,10 @@
   .dots .d{ width:9px; height:9px; border-radius:50%; background:#B9D9EA; }
   .dots .d.active{ background:var(--sky-deep); width:22px; border-radius:6px; }
   .version-tag{
-  position:absolute; bottom:8px; right:12px;
-  font-size:11px; color:#B9D9EA; font-weight:700;
-  pointer-events:none; z-index:5; user-select:none;
-}
+    position:absolute; bottom:8px; right:12px;
+    font-size:11px; color:#B9D9EA; font-weight:700;
+    pointer-events:none; z-index:5; user-select:none;
+  }
 
   /* ================= DRAW SCREEN ================= */
   #draw{ position:fixed; inset:0; display:none; flex-direction:column; background:var(--sky); }
@@ -187,7 +187,7 @@
     <div class="dots" id="dots"></div>
 
     <input type="file" id="pdfInput" accept="application/pdf,image/png,image/jpeg,image/jpg,image/webp" multiple style="display:none;">
-    <div class="version-tag">v1.0</div>
+    <div class="version-tag">v1.2</div>
   </div>
 
   <!-- ============ DRAW ============ -->
@@ -529,40 +529,25 @@ let outlineRetryTimer = null;
 
 function loadOutlineWithRetry(src){
   let retried = false;
-  let resolved = false;
   clearTimeout(outlineRetryTimer);
 
-  outlineImg.onload = () => {
-    resolved = true;
-    console.log("[outline] onload fired — naturalWidth:", outlineImg.naturalWidth, "complete:", outlineImg.complete);
-  };
-
-  function forceReload(reason){
+  function forceReload(){
     if (retried) return;
     retried = true;
-    console.log("[outline] forceReload triggered — reason:", reason);
+    // Kept as a defensive fallback for genuine transient load failures.
     // Reassigning the exact same src value is often silently ignored by
-    // the browser (no visible change, no reload attempt). Clearing it
-    // first guarantees the next assignment is seen as a real change.
+    // the browser, so clear it first to force a real reload attempt.
     outlineImg.src = "";
     requestAnimationFrame(() => {
       outlineImg.src = src;
     });
   }
 
-  outlineImg.onerror = (e) => {
-    console.log("[outline] onerror fired", e);
-    forceReload("onerror");
-  };
-
-  console.log("[outline] assigning src — length:", src.length);
+  outlineImg.onerror = forceReload;
   outlineImg.src = src;
-  console.log("[outline] immediately after assignment — complete:", outlineImg.complete, "naturalWidth:", outlineImg.naturalWidth);
-
   outlineRetryTimer = setTimeout(() => {
-    console.log("[outline] 700ms check — resolved:", resolved, "complete:", outlineImg.complete, "naturalWidth:", outlineImg.naturalWidth, "retried:", retried);
     if (!retried && !outlineImg.complete){
-      forceReload("timeout-fallback");
+      forceReload();
     }
   }, 700);
 }
@@ -896,7 +881,7 @@ document.getElementById("pdfInput").addEventListener("change", async (e)=>{
       const outlineData = await fileToOutlineData(file);
       const id = "page_" + Date.now() + "_" + Math.random().toString(36).slice(2,7);
       const name = file.name.replace(/\.[^.]+$/,"").slice(0,20) || "Imported";
-      imported.push({id, name, outline: outlineData, createdAt: Date.now()});
+      imported.push({id, name, outline: outlineData, createdAt: Date.now(), custom: true});
     }catch(err){
       console.error(err);
       failCount++;
