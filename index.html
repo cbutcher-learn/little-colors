@@ -89,6 +89,11 @@
   .dots{ flex:0 0 auto; display:flex; justify-content:center; gap:8px; padding-top:8px; }
   .dots .d{ width:9px; height:9px; border-radius:50%; background:#B9D9EA; }
   .dots .d.active{ background:var(--sky-deep); width:22px; border-radius:6px; }
+  .version-tag{
+  position:absolute; bottom:8px; right:12px;
+  font-size:11px; color:#B9D9EA; font-weight:700;
+  pointer-events:none; z-index:5; user-select:none;
+}
 
   /* ================= DRAW SCREEN ================= */
   #draw{ position:fixed; inset:0; display:none; flex-direction:column; background:var(--sky); }
@@ -182,6 +187,7 @@
     <div class="dots" id="dots"></div>
 
     <input type="file" id="pdfInput" accept="application/pdf,image/png,image/jpeg,image/jpg,image/webp" multiple style="display:none;">
+    <div class="version-tag">v1.0</div>
   </div>
 
   <!-- ============ DRAW ============ -->
@@ -523,11 +529,18 @@ let outlineRetryTimer = null;
 
 function loadOutlineWithRetry(src){
   let retried = false;
+  let resolved = false;
   clearTimeout(outlineRetryTimer);
 
-  function forceReload(){
+  outlineImg.onload = () => {
+    resolved = true;
+    console.log("[outline] onload fired — naturalWidth:", outlineImg.naturalWidth, "complete:", outlineImg.complete);
+  };
+
+  function forceReload(reason){
     if (retried) return;
     retried = true;
+    console.log("[outline] forceReload triggered — reason:", reason);
     // Reassigning the exact same src value is often silently ignored by
     // the browser (no visible change, no reload attempt). Clearing it
     // first guarantees the next assignment is seen as a real change.
@@ -537,11 +550,19 @@ function loadOutlineWithRetry(src){
     });
   }
 
-  outlineImg.onerror = forceReload;
+  outlineImg.onerror = (e) => {
+    console.log("[outline] onerror fired", e);
+    forceReload("onerror");
+  };
+
+  console.log("[outline] assigning src — length:", src.length);
   outlineImg.src = src;
+  console.log("[outline] immediately after assignment — complete:", outlineImg.complete, "naturalWidth:", outlineImg.naturalWidth);
+
   outlineRetryTimer = setTimeout(() => {
+    console.log("[outline] 700ms check — resolved:", resolved, "complete:", outlineImg.complete, "naturalWidth:", outlineImg.naturalWidth, "retried:", retried);
     if (!retried && !outlineImg.complete){
-      forceReload();
+      forceReload("timeout-fallback");
     }
   }, 700);
 }
